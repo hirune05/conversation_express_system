@@ -1,0 +1,174 @@
+<!DOCTYPE html>
+<html lang="ja">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>感情表現システム</title>
+    <link rel="stylesheet" href="css/style.css" />
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.7.0/p5.min.js"></script>
+  </head>
+  <body>
+    <div id="main-container">
+      <div id="left-section">
+        <div id="animated-canvas-holder"></div>
+        <div id="parameters">
+      <h3>パラメータ調整</h3>
+      <!-- アニメーション速度 -->
+      <div class="param-group">
+        <label>アニメーション速度（秒）:</label>
+        <input
+          type="range"
+          id="animationSpeed"
+          min="0.1"
+          max="3"
+          step="0.1"
+          value="1"
+        />
+        <span class="value" id="animationSpeedValue">1</span>
+      </div>
+      <hr style="margin: 20px 0; border: none; border-top: 1px solid #ccc" />
+      <!-- 目関連のパラメータ -->
+      <div class="param-group">
+        <label>目の開き具合:</label>
+        <input
+          type="range"
+          id="eyeOpenness"
+          min="0.15"
+          max="1"
+          step="0.05"
+          value="1"
+        />
+        <span class="value" id="eyeOpennessValue">1</span>
+      </div>
+      <div class="param-group">
+        <label>瞳の大きさ:</label>
+        <input
+          type="range"
+          id="pupilSize"
+          min="0.3"
+          max="1.0"
+          step="0.05"
+          value="0.7"
+        />
+        <span class="value" id="pupilSizeValue">0.7</span>
+      </div>
+      <div class="param-group">
+        <label>瞳の角度:</label>
+        <input
+          type="range"
+          id="pupilAngle"
+          min="-30"
+          max="30"
+          step="1"
+          value="0"
+        />
+        <span class="value" id="pupilAngleValue">0</span>
+      </div>
+      <div class="param-group">
+        <label>上瞼の角度:</label>
+        <input
+          type="range"
+          id="upperEyelidAngle"
+          min="-30"
+          max="30"
+          step="1"
+          value="0"
+        />
+        <span class="value" id="upperEyelidAngleValue">0</span>
+      </div>
+      <div class="param-group">
+        <label>上瞼の覆い具合:</label>
+        <input
+          type="range"
+          id="upperEyelidCoverage"
+          min="0"
+          max="0.3"
+          step="0.01"
+          value="0"
+        />
+        <span class="value" id="upperEyelidCoverageValue">0</span>
+      </div>
+      <div class="param-group">
+        <label>下瞼の覆い具合:</label>
+        <input
+          type="range"
+          id="lowerEyelidCoverage"
+          min="0"
+          max="0.3"
+          step="0.01"
+          value="0"
+        />
+        <span class="value" id="lowerEyelidCoverageValue">0</span>
+      </div>
+      <!-- 口関連のパラメータ -->
+      <div class="param-group">
+        <label>口角の上がり具合:</label>
+        <input
+          type="range"
+          id="mouthCurve"
+          min="-18"
+          max="40"
+          step="1"
+          value="0"
+        />
+        <span class="value" id="mouthCurveValue">0</span>
+      </div>
+      <div class="param-group">
+        <label>口の開き具合（縦）:</label>
+        <input
+          type="range"
+          id="mouthHeight"
+          min="0"
+          max="3"
+          step="0.05"
+          value="0"
+        />
+        <span class="value" id="mouthHeightValue">0</span>
+      </div>
+      <div class="param-group">
+        <label>口の大きさ（横）:</label>
+        <input
+          type="range"
+          id="mouthWidth"
+          min="0.5"
+          max="4"
+          step="0.05"
+          value="1"
+        />
+        <span class="value" id="mouthWidthValue">1</span>
+      </div>
+        </div>
+      </div>
+      <div id="right-section">
+        <div id="static-canvas-holder"></div>
+        <div id="subject-id-container">
+          <label for="subject-id">被験者ID:</label>
+          <input type="text" id="subject-id" placeholder="例: S001" />
+        </div>
+        <div id="execute-button-container">
+          <button id="execute-button" onclick="executeAction()">実行</button>
+          <button id="reset-button" onclick="resetAction()">リセット</button>
+          <button id="save-button" onclick="saveAction()" style="margin-left: 20px;">保存（決定）</button>
+        </div>
+        <div id="emotion-buttons">
+          <button class="emotion-btn" onclick="setEmotion('normal')">ニュートラル</button>
+          <button class="emotion-btn" onclick="setEmotion('surprise')">驚愕</button>
+          <button class="emotion-btn" onclick="setEmotion('anger')">怒り</button>
+          <button class="emotion-btn" onclick="setEmotion('joy')">喜び</button>
+          <button class="emotion-btn" onclick="setEmotion('sleepy')">眠気</button>
+          <button class="emotion-btn" onclick="setEmotion('sad')">悲しみ</button>
+        </div>
+        <div id="emotion-description">感情を選択してください</div>
+      </div>
+    </div>
+
+    <!-- JavaScriptファイルの読み込み順序に注意 -->
+    <script src="js/config/parameters.js"></script>
+    <script src="js/utils/parameter-mapper.js"></script>
+    <script src="js/renderers/eye-renderer.js"></script>
+    <script src="js/renderers/mouth-renderer.js"></script>
+    <script src="js/controllers/ui-controller.js"></script>
+    <script src="js/main.js"></script>
+    <script src="js/demo/json-emotion-demo.js"></script>
+  </body>
+</html>

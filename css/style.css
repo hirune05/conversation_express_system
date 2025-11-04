@@ -1,0 +1,252 @@
+body {
+  font-family: Arial, sans-serif;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  margin: 0;
+  padding: 40px;
+  background-color: black;
+  color: white;
+  min-height: 100vh;
+  box-sizing: border-box;
+}
+
+h1 {
+  color: white;
+}
+
+#controls {
+  margin: 20px;
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+  justify-content: center;
+}
+
+button {
+  padding: 10px 20px;
+  font-size: 16px;
+  cursor: pointer;
+  background-color: #4caf50;
+  color: white;
+  border: none;
+  border-radius: 5px;
+  transition: background-color 0.3s;
+}
+
+button:hover {
+  background-color: #45a049;
+}
+
+#execute-button-container {
+  margin: 15px 0;
+  display: flex;
+  gap: 10px;
+  justify-content: center;
+  flex-wrap: nowrap;
+  max-width: 400px;
+}
+
+#execute-button,
+#reset-button,
+#save-button {
+  padding: 10px 20px;
+  font-size: 16px;
+  font-weight: bold;
+  border: none;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: all 0.3s;
+  flex: 1 1 auto;
+  white-space: nowrap;
+}
+
+#execute-button {
+  background-color: #2196f3;
+  color: white;
+}
+
+#execute-button:hover {
+  background-color: #1976d2;
+  transform: scale(1.05);
+}
+
+#reset-button {
+  background-color: #ff5722;
+  color: white;
+}
+
+#reset-button:hover {
+  background-color: #e64a19;
+  transform: scale(1.05);
+}
+
+#save-button {
+  background-color: #4caf50;
+  color: white;
+}
+
+#save-button:hover {
+  background-color: #45a049;
+  transform: scale(1.05);
+}
+
+#main-container {
+  display: flex;
+  gap: 30px;
+  align-items: flex-start;
+  margin: 20px 0;
+  transform: scale(0.85);
+  transform-origin: center top;
+}
+
+#left-section,
+#right-section {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+#static-canvas-holder canvas,
+#animated-canvas-holder canvas {
+  display: block !important;
+  border: 2px solid #ddd;
+  width: 100%;
+  height: 100%;
+  max-width: 600px;
+  max-height: 400px;
+}
+
+#emotion-buttons {
+  margin: 20px 0;
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 10px;
+  padding: 0;
+  max-width: 400px;
+  width: 100%;
+}
+
+.emotion-btn {
+  padding: 10px 16px;
+  font-size: 14px;
+  font-weight: bold;
+  background-color: white;
+  color: black;
+  border: 1px solid #ddd;
+  border-radius: 5px;
+  cursor: pointer;
+  transition: all 0.3s;
+}
+
+.emotion-btn:hover {
+  background-color: #f5f5f5;
+  transform: scale(1.05);
+}
+
+.emotion-btn.active {
+  background-color: #ff8c00;
+  color: white;
+  border: 1px solid #ff8c00;
+  box-shadow: 0 0 0 3px #ff8c00, 0 0 0 5px white, 0 0 0 7px #ff8c00;
+  transform: scale(1.05);
+}
+
+.emotion-btn.active:hover {
+  background-color: #ff7f00;
+}
+
+.emotion-btn.saved {
+  background-color: #9e9e9e;
+  color: white;
+  cursor: not-allowed;
+  opacity: 0.6;
+}
+
+.emotion-btn.saved:hover {
+  background-color: #9e9e9e;
+  transform: none;
+}
+
+#emotion-description {
+  margin: 0px 0 20px 0;
+  padding: 15px;
+  background-color: white;
+  border-radius: 8px;
+  border: 1px solid #ddd;
+  font-size: 18px;
+  line-height: 1.6;
+  color: #333;
+  min-height: 60px;
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
+  text-align: left;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+  max-width: 400px;
+  width: 100%;
+}
+
+#parameters {
+  margin: 15px 0;
+  padding: 12px;
+  background-color: white;
+  border-radius: 10px;
+  box-shadow: 0 2px 5px rgba(255, 255, 255, 0.2);
+  color: black;
+  max-width: 400px;
+}
+
+.param-group {
+  margin: 10px 0;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+label {
+  width: 150px;
+  font-weight: bold;
+}
+
+input[type="range"] {
+  width: 200px;
+}
+
+.value {
+  width: 50px;
+  text-align: center;
+}
+
+#subject-id-container {
+  margin: 15px 0;
+  text-align: center;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  max-width: 400px;
+  width: 100%;
+}
+
+#subject-id-container label {
+  font-weight: bold;
+  font-size: 16px;
+  width: auto;
+}
+
+#subject-id {
+  padding: 8px 12px;
+  font-size: 14px;
+  border: 1px solid #ddd;
+  border-radius: 5px;
+  width: 320px;
+  background-color: #f5f5f5;
+  color: #555;
+  font-family: 'Courier New', monospace;
+}
+
+#subject-id[readonly] {
+  cursor: not-allowed;
+  background-color: #e9e9e9;
+}

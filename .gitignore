@@ -1,0 +1,4 @@
+node_modules/
+emotion_data.csv
+.DS_Store
+*.log

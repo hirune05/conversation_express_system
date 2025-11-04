@@ -1,6 +1,6 @@
 // 目の描画関数
 
-function drawEyes() {
+function drawEyes(params) {
   let eyeSpacing = width * 0.42; // 画面の横幅の40%
   let eyeSize = 120;
 
@@ -10,17 +10,17 @@ function drawEyes() {
   // 左目
   push();
   translate(-eyeSpacing / 2, eyeY);
-  drawEye(eyeSize, true); // 左目
+  drawEye(eyeSize, true, params); // 左目
   pop();
 
   // 右目
   push();
   translate(eyeSpacing / 2, eyeY);
-  drawEye(eyeSize, false); // 右目
+  drawEye(eyeSize, false, params); // 右目
   pop();
 }
 
-function drawEye(size, isLeft) {
+function drawEye(size, isLeft, params) {
   push();
 
   // 白目部分
@@ -30,7 +30,7 @@ function drawEye(size, isLeft) {
   ellipse(0, 0, size, size);
 
   // 目の開き具合に応じて描画を変更
-  if (faceParams.eyeOpenness <= 0.1) {
+  if (params.eyeOpenness <= 0.1) {
     // 完全に閉じた目（弧として描画）
     fill(255, 235, 250); // 背景と同じ色で上半分を塗りつぶす
     noStroke();
@@ -44,17 +44,17 @@ function drawEye(size, isLeft) {
   } else {
     // 瞳（黒目）- eyeOpennessに応じて縦方向のサイズを調整
     push();
-    let pupilAngle = isLeft ? faceParams.pupilAngle : -faceParams.pupilAngle;
+    let pupilAngle = isLeft ? params.pupilAngle : -params.pupilAngle;
     rotate(radians(pupilAngle));
 
     fill(0);
     noStroke();
-    let pupilWidth = size * 0.7 * faceParams.pupilSize;
-    let pupilHeight = pupilWidth * faceParams.eyeOpenness;
+    let pupilWidth = size * 0.7 * params.pupilSize;
+    let pupilHeight = pupilWidth * params.eyeOpenness;
     ellipse(0, 0, pupilWidth, pupilHeight);
 
     // 光の反射（目が開いているときのみ）
-    if (faceParams.eyeOpenness > 0.3) {
+    if (params.eyeOpenness > 0.3) {
       fill(255);
       let highlightSize = pupilWidth * 0.2;
       ellipse(0, -pupilHeight * 0.2, highlightSize, highlightSize);
@@ -64,9 +64,9 @@ function drawEye(size, isLeft) {
   }
 
   // 上瞼の効果（目の中に線を引いて上部を塗りつぶす）
-  if (abs(faceParams.upperEyelidAngle) > 0 || faceParams.upperEyelidCoverage > 0) {
+  if (abs(params.upperEyelidAngle) > 0 || params.upperEyelidCoverage > 0) {
     // 上瞼の線の位置を計算（覆い具合のみで決定）
-    let eyelidY = -size * 0.5 + size * 1.2 * faceParams.upperEyelidCoverage; // 覆い具合による位置
+    let eyelidY = -size * 0.5 + size * 1.2 * params.upperEyelidCoverage; // 覆い具合による位置
 
     // クリッピングマスクで目の円の中だけ描画
     push();
@@ -79,7 +79,7 @@ function drawEye(size, isLeft) {
 
     // 上瞼の角度に応じて傾いた上瞼を描画
     push();
-    let lidAngle = isLeft ? faceParams.upperEyelidAngle : -faceParams.upperEyelidAngle;
+    let lidAngle = isLeft ? params.upperEyelidAngle : -params.upperEyelidAngle;
     rotate(radians(lidAngle * 0.5)); // 上瞼の角度
 
     // 上瞼の線より上を白で塗りつぶす
@@ -99,12 +99,12 @@ function drawEye(size, isLeft) {
   }
 
   // 下瞼を描画
-  if (faceParams.lowerEyelidCoverage > 0) {
+  if (params.lowerEyelidCoverage > 0) {
     push();
 
     // 下瞼の位置をパラメータで調整
-    let lowerEyelidY = size * 0.5 - size * faceParams.lowerEyelidCoverage;
-    let arcHeight = size * 0.2 + size * faceParams.lowerEyelidCoverage * 0.3;
+    let lowerEyelidY = size * 0.5 - size * params.lowerEyelidCoverage;
+    let arcHeight = size * 0.2 + size * params.lowerEyelidCoverage * 0.3;
 
     // まず目の輪郭の下部分をピンクで上書き（下瞼の弧から下の部分）
     stroke(255, 235, 250); // 背景と同じピンク色

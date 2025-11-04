@@ -4,7 +4,7 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>感情表現システム</title>
-    <link rel="stylesheet" href="css/style.css" />
+    <link rel="stylesheet" href="/static/css/style.css" />
     <script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.7.0/p5.min.js"></script>
   </head>
   <body>
@@ -159,16 +159,26 @@
           <button class="emotion-btn" onclick="setEmotion('sad')">悲しみ</button>
         </div>
         <div id="emotion-description">感情を選択してください</div>
+
+        <!-- チャットUIコンテナ -->
+        <div id="chat-container">
+          <div id="chat-history"></div>
+          <div id="chat-input-container">
+            <input type="text" id="chat-input" placeholder="メッセージを入力...">
+            <button id="chat-send">送信</button>
+          </div>
+        </div>
+
       </div>
     </div>
 
     <!-- JavaScriptファイルの読み込み順序に注意 -->
-    <script src="js/config/parameters.js"></script>
-    <script src="js/utils/parameter-mapper.js"></script>
-    <script src="js/renderers/eye-renderer.js"></script>
-    <script src="js/renderers/mouth-renderer.js"></script>
-    <script src="js/controllers/ui-controller.js"></script>
-    <script src="js/main.js"></script>
-    <script src="js/demo/json-emotion-demo.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.7.5/socket.io.js"></script>
+    <script src="/static/js/config/parameters.js"></script>
+    <script src="/static/js/utils/parameter-mapper.js"></script>
+    <script src="/static/js/renderers/eye-renderer.js"></script>
+    <script src="/static/js/renderers/mouth-renderer.js"></script>
+    <script src="/static/js/controllers/ui-controller.js"></script>
+    <script src="/static/js/main.js"></script>
   </body>
 </html>

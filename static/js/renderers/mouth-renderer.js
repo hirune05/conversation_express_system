@@ -1,6 +1,6 @@
 // 口の描画関数
 
-function drawMouth() {
+function drawMouth(params) {
   push();
   // 目との相対位置を保ちながら配置
   let mouthY = height * 0.26; // 中心からの相対位置
@@ -12,15 +12,15 @@ function drawMouth() {
   noFill();
 
   // 口の基本的な幅と高さ
-  let mouthWidth = 80 * faceParams.mouthWidth;
+  let mouthWidth = 80 * params.mouthWidth;
   let mouthHeight = 10;
 
   // 口角の上がり具合（-30〜30）
-  let cornerLift = faceParams.mouthCurve;
+  let cornerLift = params.mouthCurve;
 
   // 口の縦方向の開き具合を調整
-  if (faceParams.mouthHeight > 0) {
-    mouthHeight = mouthHeight + faceParams.mouthHeight * 40;
+  if (params.mouthHeight > 0) {
+    mouthHeight = mouthHeight + params.mouthHeight * 40;
   }
 
   // ベジェ曲線で口を描画
@@ -49,7 +49,7 @@ function drawMouth() {
   );
 
   // 口が開いている場合は下唇も描く
-  if (faceParams.mouthHeight > 0) {
+  if (params.mouthHeight > 0) {
     bezierVertex(
       rightX - mouthWidth * 0.25,
       centerY + mouthHeight / 2,

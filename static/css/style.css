@@ -250,3 +250,75 @@ input[type="range"] {
   cursor: not-allowed;
   background-color: #e9e9e9;
 }
+
+/* チャットUIのスタイル */
+#chat-container {
+  margin-top: 20px;
+  width: 100%;
+  max-width: 400px;
+  border: 1px solid #ddd;
+  border-radius: 8px;
+  display: flex;
+  flex-direction: column;
+  background-color: white;
+  height: 300px; /* 高さを固定 */
+}
+
+#chat-history {
+  flex-grow: 1;
+  overflow-y: auto; /* スクロール可能に */
+  padding: 10px;
+  color: black;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.chat-message {
+  padding: 8px 12px;
+  border-radius: 15px;
+  max-width: 80%;
+  word-wrap: break-word;
+}
+
+.user-message {
+  background-color: #007bff;
+  color: white;
+  align-self: flex-end;
+  border-bottom-right-radius: 3px;
+}
+
+.bot-message {
+  background-color: #f1f1f1;
+  color: black;
+  align-self: flex-start;
+  border-bottom-left-radius: 3px;
+}
+
+#chat-input-container {
+  display: flex;
+  border-top: 1px solid #ddd;
+}
+
+#chat-input {
+  flex-grow: 1;
+  border: none;
+  padding: 12px;
+  font-size: 16px;
+  outline: none;
+  border-radius: 0 0 0 8px; /* 左下のみ角丸 */
+}
+
+#chat-send {
+  background-color: #2196f3;
+  color: white;
+  border: none;
+  padding: 0 20px;
+  cursor: pointer;
+  font-size: 16px;
+  border-radius: 0 0 8px 0; /* 右下のみ角丸 */
+}
+
+#chat-send:hover {
+  background-color: #1976d2;
+}

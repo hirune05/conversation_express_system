@@ -1,7 +1,7 @@
 
 
 // --- グローバル変数 ---
-let staticCanvas, animatedCanvas;
+let staticCanvas;
 let canvasCreated = false;
 let rightCurrentParams = {}; // 右側の顔の現在のパラメータ
 let rightTargetParams = {};  // 右側の顔の目標パラメータ
@@ -22,16 +22,9 @@ function setup() {
   mainCanvas.hide();
   
   staticCanvas = createGraphics(540, 360);
-  animatedCanvas = createGraphics(540, 360);
 
   setupUIListeners();
   setupSocketListeners(); // Socket.IOリスナーを設定
-  
-  setTimeout(() => {
-    setEmotion('normal');
-    updateSavedButtonStates();
-    generateUniqueSubjectId();
-  }, 200);
   
   // 右側の顔の初期パラメータ
   rightCurrentParams = {
@@ -41,8 +34,6 @@ function setup() {
   };
   
   setTimeout(() => {
-    let animatedHolder = document.getElementById('animated-canvas-holder');
-    animatedHolder.appendChild(animatedCanvas.canvas);
     let staticHolder = document.getElementById('static-canvas-holder');
     staticHolder.appendChild(staticCanvas.canvas);
     canvasCreated = true;
@@ -53,7 +44,6 @@ function setup() {
 function draw() {
   if (!canvasCreated) return;
   drawStaticFace();
-  drawAnimatedFace();
 }
 
 // --- UIイベントリスナー設定 ---
@@ -98,7 +88,10 @@ function setupSocketListeners() {
         rightTargetParams = params;
         console.log('rightTargetParams after update_expression:', rightTargetParams); // ADDED LOG
         // アニメーションを実行
-        executeAction();
+        rightAnimationDuration = 1000;
+        rightStartParams = { ...rightCurrentParams };
+        rightAnimationStartTime = millis();
+        rightAnimationActive = true;
     });
 
     socket.on('save_success', (data) => {
@@ -184,112 +177,7 @@ function updateRightAnimation() {
   }
 }
 
-function executeAction() {
-  console.log('executeAction() called.');
-  const speedValue = parseFloat(document.getElementById("animationSpeed").value);
-  rightAnimationDuration = speedValue * 1000;
-  rightStartParams = { ...rightCurrentParams };
-  // rightTargetParams は 'update_expression' で設定される
-  rightAnimationStartTime = millis();
-  rightAnimationActive = true;
-  console.log('rightStartParams:', rightStartParams);
-  console.log('rightTargetParams:', rightTargetParams);
-}
 
-function resetAction() {
-  rightAnimationActive = false;
-  rightCurrentParams = {
-    eyeOpenness: 1, pupilSize: 0.7, pupilAngle: 0, upperEyelidAngle: 0,
-    upperEyelidCoverage: 0, lowerEyelidCoverage: 0, mouthCurve: 0,
-    mouthHeight: 0, mouthWidth: 1
-  };
-}
-
-// --- データ保存 ---
-function saveAction() {
-  const subjectId = document.getElementById('subject-id').value.trim();
-  if (!subjectId) {
-    alert('被験者IDを入力してください。');
-    return;
-  }
-  
-  const now = new Date();
-  const jstOffset = 9 * 60;
-  const jstTime = new Date(now.getTime() + jstOffset * 60 * 1000);
-  const timestamp = jstTime.toISOString().replace('T', ' ').replace('Z', '');
-  const animationDuration = document.getElementById('animationSpeed').value;
-  
-  const data = {
-    subject_id: subjectId,
-    timestamp: timestamp,
-    emotion_label: currentEmotion,
-    animationDuration: animationDuration,
-    ...rightCurrentParams
-  };
-
-  // WebSocketでサーバーにデータを送信
-  socket.emit('save_data', data);
-  
-  // 保存済み感情の処理 (UI更新)
-  savedEmotions.add(currentEmotion);
-  updateSavedButtonStates();
-  moveToNextUnsavedEmotion();
-}
-
-
-// --- 既存の補助関数 (変更なし) ---
-
-function drawAnimatedFace() {
-  animatedCanvas.background(255, 235, 250);
-  animatedCanvas.push();
-  animatedCanvas.translate(animatedCanvas.width / 2, animatedCanvas.height / 2);
-  updateAnimation();
-  let originalCtx = setupContext(animatedCanvas);
-  drawEyes(faceParams);
-  drawMouth(faceParams);
-  restoreContext(originalCtx);
-  animatedCanvas.pop();
-}
-
-function moveToNextUnsavedEmotion() {
-  const emotionOrder = ['normal', 'surprise', 'anger', 'joy', 'sleepy', 'sad'];
-  const currentIndex = emotionOrder.indexOf(currentEmotion);
-  for (let i = 1; i <= emotionOrder.length; i++) {
-    const nextIndex = (currentIndex + i) % emotionOrder.length;
-    const nextEmotion = emotionOrder[nextIndex];
-    if (!savedEmotions.has(nextEmotion)) {
-      setEmotion(nextEmotion);
-      return;
-    }
-  }
-  alert('すべての感情のデータを保存しました！');
-}
-
-function updateSavedButtonStates() {
-  document.querySelectorAll('.emotion-btn').forEach(btn => {
-    const emotionName = btn.getAttribute('onclick').match(/setEmotion\('(\w+)'\)/)[1];
-    if (savedEmotions.has(emotionName)) {
-      btn.classList.add('saved');
-      btn.disabled = true;
-    } else {
-      btn.classList.remove('saved');
-      btn.disabled = false;
-    }
-  });
-}
-
-function generateUniqueSubjectId() {
-  function generateUUID() {
-    return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
-      const r = Math.random() * 16 | 0;
-      const v = c === 'x' ? r : (r & 0x3 | 0x8);
-      return v.toString(16);
-    });
-  }
-  const subjectIdField = document.getElementById('subject-id');
-  subjectIdField.value = generateUUID();
-  subjectIdField.readOnly = true;
-}
 
 function setupContext(canvas) {
   const original = { push: window.push, pop: window.pop, translate: window.translate, fill: window.fill, stroke: window.stroke, strokeWeight: window.strokeWeight, ellipse: window.ellipse, arc: window.arc, rotate: window.rotate, radians: window.radians, rect: window.rect, line: window.line, noFill: window.noFill, noStroke: window.noStroke, beginShape: window.beginShape, vertex: window.vertex, endShape: window.endShape, curveVertex: window.curveVertex, width: window.width, height: window.height, drawingContext: window.drawingContext, abs: window.abs, asin: window.asin, cos: window.cos, sin: window.sin, PI: window.PI, TWO_PI: window.TWO_PI, CLOSE: window.CLOSE };

@@ -28,40 +28,63 @@ socketio = SocketIO(app, cors_allowed_origins="*")
 # --- Ollamaの初期化 ---
 client = ollama.Client()
 
-# --- 表情計算ロジック (culcuration.pyより) ---
-# 6種類の「お手本」の表情パラメータ
+# --- 表情計算ロジック ---
+
+# 論文  に記載されている式(2)の w の値
+W = 2.0
+# 論文  の式(2)にある ε (イプシロン) の値（ゼロ除算防止用）
+EPSILON = 1e-9 
+
+# --- ご注意 ------------------------------------------------------------------
+# 以下のパラメーターとVA座標の「具体的な数値」は論文に記載されていません。
+# 元のコードの数値を流用し、感情名のみ論文  の記述に合わせています。
+# ---------------------------------------------------------------------------
 KEYFRAME_PARAMS = {
-    "happy": np.array([0.25, 0.65, -10, -20, 0, 0.2, 40, 3.0, 4.0]),
+    "happy": np.array([0.25, 0.65, -10, -20, 0, 0.2, 40, 1.45, 2.5]),
     "angry": np.array([0.9, 0.8, 5, 20, 0.15, 0.2, -15, 0.3, 0.9]),
     "sad": np.array([0.8, 0.6, -5, -15, 0.18, 0.15, -18, 0.1, 0.8]),
     "calm": np.array([0.15, 0.7, -13, -26, 0, 0, 12, 0.3, 1.2]),
-    "surprise": np.array([1, 0.4, 10, 25, 0.0, 0.0, 15, 3, 0.65]),
-    "fear": np.array([1, 0.55, 0, -29, 0.07, 0, -11, 2.05, 0.8])
+    "astonished": np.array([1, 0.4, 10, 25, 0.0, 0.0, 15, 3, 0.65]),
+    # "fear" -> "sleepy" に変更 
+    "sleepy": np.array([0.15, 0.75, -11, 0, 0, 0, -15, 0.7, 1.55])
 }
 # 6感情に対応する「VA座標」
 KEYFRAME_VA = {
-    "happy": np.array([4.5, 3.5]), "angry": np.array([-4.0, 4.0]),
-    "sad": np.array([-4.0, -3.0]), "calm": np.array([4.0, -3.0]),
-    "surprise": np.array([1.0, 4.5]), "fear": np.array([-2.5, 3.5])
+    "happy": np.array([4.45, 0.85]), 
+    "angry": np.array([-2.0, 3.95]),
+    "sad": np.array([-4.5, -2.0]), 
+    "calm": np.array([3.9, -4.0]),
+    "astonished": np.array([5.0, 0.0]), 
+    # "fear" -> "sleepy" に変更 
+    "sleepy": np.array([0.05, -5.0])
 }
 
 def get_interpolated_expression(target_v, target_a):
     """ ターゲットのVA座標に基づき、表情パラメータを補間する """
     target_va = np.array([target_v, target_a])
     total_weight = 0.0
-    weighted_params = np.zeros(9)
+    weighted_params = np.zeros(9) # パラメータの数（元のコードに依存）
     
     for emotion_name, key_va in KEYFRAME_VA.items():
         distance = np.linalg.norm(target_va - key_va)
-        if distance < EPSILON:
-            return KEYFRAME_PARAMS[emotion_name]
-        weight = 1.0 / (distance ** IDW_POWER)
+        
+        # --- 修正点 ----------------------------------------------------
+        # 論文の式(2)  に基づき、rtop_k (weight) を計算
+        # rtop_k = 1 / ((100 * d_k)^w + ε)
+        weight = 1.0 / (((100 * distance) ** W) + EPSILON)
+        # -----------------------------------------------------------
+        
         total_weight += weight
         weighted_params += weight * KEYFRAME_PARAMS[emotion_name]
         
+    # 論文の式(1) [cite: 44] と 式(3) [cite: 48] を組み合わせた計算
     final_params = weighted_params / total_weight
-    if final_params[0] >= 0.35: final_params[0] = 1.0
+    if final_params[0] >= 0.4: final_params[0] = 1.0
     else: final_params[0] = 0.2
+
+    if final_params[4] < 0.1:
+        final_params[4] = 0
+        
     return final_params
 
 # --- Flaskルーティング ---

@@ -99,17 +99,17 @@ def handle_message(data):
     """ ユーザーからのメッセージを処理し、LLM 응답と表情パラメータを返す """
     messages = data["messages"]
     
-    # LLMへの指示を追加
+    # --- ★ 修正点 1: プロンプトの変更 ---
+    # 感情を「先」に出力するように指示を変更
     instruction = """あなたは、ユーザの感情を理解し、自分自身も感情を表現できる未友達ロボットです。
-    あなたは、ユーザの感情を理解し、自分自身も感情を表現できる未友達ロボットです。
     ユーザーと自然な日本語で対話してください。
-    そして、対話の後、必ず改行して、その文脈におけるあなたの感情を「ラッセルの円環モデル（VA座標）」で分析してください。
 
     # ルール
-    1.  **対話:** ユーザーの発言に対し、感情を持ったAIとして自然な応答を返します。
-    2.  **感情分析 (あなた自身):** 応答の後、必ず改行し `EMOTION: (V, A)` という形式で**あなた自身の**感情座標を出力します。また、その座標の示す感情も一言（）で書いてください。
-    3.  **V (快・不快):** -5.0（非常に不快）から 5.0（非常に快適）までの少数を含む連続値です。
-    4.  **A (覚醒・鎮静):** -5.0（非常に鎮静・眠い）から 5.0（非常に覚醒・興奮）までの少数を含む連続値です。
+    1.  **感情分析 (あなた自身):** まず `EMOTION: (V, A)` という形式で**あなた自身の**感情座標を出力します。また、その座標の示す感情も一言（）で書いてください。
+    2.  **改行:** 必ず改行します。
+    3.  **対話:** ユーザーの発言に対し、感情を持ったAIとして自然な応答を返します。
+    4.  **V (快・不快):** -5.0（非常に不快）から 5.0（非常に快適）までの少数を含む連続値です。
+    5.  **A (覚醒・鎮静):** -5.0（非常に鎮静・眠い）から 5.0（非常に覚醒・興奮）までの少数を含む連続値です。
 
     # VA座標の感情例
     mood,valence,arousal
@@ -151,24 +151,29 @@ def handle_message(data):
     # お手本 (AI自身の感情)
 
     ユーザー: こんにちは。
-    あなた: あ、こんにちは。えっと、よろしくお願いします。
+    あなた: 
     EMOTION: (3.0, -1.5) （hopeful）
+    あ、こんにちは。えっと、よろしくお願いします。
 
     ユーザー: やった！ついにプロジェクトが完成したんだ！
-    あなた: わっ、本当ですか！すごい…！おめでとうございます！
+    あなた: 
     EMOTION: (3.5, 3.6) （excited）
+    わっ、本当ですか！すごい…！おめでとうございます！
 
     ユーザー: 君は本当に役に立つね。
-    あなた: ありがとうございます！そう言ってもらえると、すごく…嬉しいです。
+    あなた: 
     EMOTION: (4.5, 0.9) （happy）
+    ありがとうございます！そう言ってもらえると、すごく…嬉しいです。
 
     ユーザー: このバグ、なんで直らないんだ！イライラする！
-    あなた: ひっ…！ご、ごめんなさい。お、落ち着いてください…。
+    あなた: 
     EMOTION: (-0.6, 4.0) （afraid）
+    ひっ…！ご、ごめんなさい。お、落ち着いてください…。
 
     ユーザー: （ため息）…別に、なんでもない。
-    あなた: そうですか…？なんだか心配です。
-    EMOTION: (-0.4, -1.6) （worried）"""
+    あなた: 
+    EMOTION: (-0.4, -1.6) （worried）
+    そうですか…？なんだか心配です。"""
     # LLMへの指示を常にメッセージリストの先頭に追加
     messages.insert(0, {"role": "system", "content": instruction})
 
@@ -178,35 +183,82 @@ def handle_message(data):
         response = client.chat(model=LLM_MODEL, messages=messages, stream=True)
         
         full_text = ""
+        
+        # --- ★ 修正点 2: ストリーム処理のロジック変更 ---
+        emotion_sent = False # 表情を送信済みかどうかのフラグ
+        buffer = "" # EMOTION行を検出するためのバッファ
+
         for chunk in response:
             if "message" in chunk:
                 subtext = chunk["message"]["content"]
-                emit("bot_stream", {"chunk": subtext})
-                full_text += subtext
-        
-        emit("bot_stream_end", {"text": full_text})
-        print(f"[Bot] {full_text}")
+                
+                if not emotion_sent:
+                    # EMOTION行が来るまでテキストをバッファに貯める
+                    buffer += subtext
+                    
+                    # EMOTION行全体（改行含む）を探す
+                    match = re.search(r'EMOTION:\s*\((-?\d+\.?\d*),\s*(-?\d+\.?\d*)\)[^\n]*\n', buffer, re.IGNORECASE)
+                    
+                    if match:
+                        # --- 感情を検出 ---
+                        emotion_sent = True
+                        v_val = float(match.group(1))
+                        a_val = float(match.group(2))
+                        print(f"--- 座標を検出 (ストリーム中): V={v_val}, A={a_val} ---")
+                        
+                        params = get_interpolated_expression(v_val, a_val)
+                        param_names = [
+                            "eyeOpenness", "pupilSize", "pupilAngle", "upperEyelidAngle", 
+                            "upperEyelidCoverage", "lowerEyelidCoverage", "mouthCurve", 
+                            "mouthHeight", "mouthWidth"
+                        ]
+                        param_dict = {name: val for name, val in zip(param_names, params)}
+                        
+                        print(f"--- 表情パラメータを送信 ---")
+                        
+                        # フロントエンドに表情パラメータを送信
+                        emit("update_expression", param_dict)
 
-        # --- 感情座標の抽出と表情パラメータの計算 ---
-        match = re.search(r'\((-?\d+\.?\d*),\s*(-?\d+\.?\d*)\)', full_text)
-        if match:
-            v_val = float(match.group(1))
-            a_val = float(match.group(2))
-            print(f"--- 抽出された座標: V={v_val}, A={a_val} ---")
-            
-            params = get_interpolated_expression(v_val, a_val)
-            param_names = [
-                "eyeOpenness", "pupilSize", "pupilAngle", "upperEyelidAngle", 
-                "upperEyelidCoverage", "lowerEyelidCoverage", "mouthCurve", 
-                "mouthHeight", "mouthWidth"
-            ]
-            param_dict = {name: val for name, val in zip(param_names, params)}
-            
-            print(f"--- 生成されたパラメータ ---")
-            print(param_dict)
-            
-            # フロントエンドに表情パラメータを送信
-            emit("update_expression", param_dict)
+                        # --- 感情行を除いた「残り」のテキストを送信 ---
+                        # マッチしたEMOTION行の「後」のテキストを取得
+                        remaining_text = buffer[match.end():]
+                        
+                        if remaining_text:
+                            emit("bot_stream", {"chunk": remaining_text})
+                            full_text += remaining_text
+                        
+                        # buffer = "" # バッファはもう使わない
+                    
+                    elif len(buffer) > 300: # 閾値 (EMOTION行は通常先頭に来るはず)
+                        # プロンプト指示に従わず、EMOTION行が来ていない場合のフォールバック
+                        print("--- 警告: EMOTION行が先頭で検出されませんでした。テキストをそのまま流します。 ---")
+                        emit("bot_stream", {"chunk": buffer})
+                        full_text += buffer
+                        emotion_sent = True # 再検索しない
+                        # buffer = ""
+                
+                else:
+                    # --- 感情送信後の通常のテキストストリーム ---
+                    emit("bot_stream", {"chunk": subtext})
+                    full_text += subtext
+
+        # ストリーム終了処理
+        
+        # バッファにテキストが残っている (＝EMOTIONが見つからないまま終わった)
+        if not emotion_sent and buffer:
+            print("--- 警告: EMOTION行が見つからないままストリームが終了しました。 ---")
+            # EMOTION行がチャットに表示されるかもしれないが、テキストは送信する
+            emit("bot_stream", {"chunk": buffer})
+            full_text += buffer
+
+        emit("bot_stream_end", {"text": full_text.strip()})
+        print(f"[Bot] {full_text.strip()}")
+
+        # --- ★ 修正点 3: 元の座標抽出ロジックは不要 ---
+        # 以下のブロックはストリーム処理に移行したため不要
+        # match = re.search(r'\((-?\d+\.?\d*),\s*(-?\d+\.?\d*)\)', full_text)
+        # if match:
+        #    ... (省略) ...
 
     except Exception as e:
         print(f"エラーが発生しました: {e}")

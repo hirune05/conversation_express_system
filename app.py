@@ -35,9 +35,8 @@ W = 2.0
 # 論文  の式(2)にある ε (イプシロン) の値（ゼロ除算防止用）
 EPSILON = 1e-9 
 
-# --- ご注意 ------------------------------------------------------------------
-# 以下のパラメーターとVA座標の「具体的な数値」は論文に記載されていません。
-# 元のコードの数値を流用し、感情名のみ論文  の記述に合わせています。
+# --- 注意 ------------------------------------------------------------------
+# まだ確実な数値ではない
 # ---------------------------------------------------------------------------
 KEYFRAME_PARAMS = {
     "happy": np.array([0.25, 0.65, -10, -20, 0, 0.2, 40, 1.45, 2.5]),
@@ -68,11 +67,9 @@ def get_interpolated_expression(target_v, target_a):
     for emotion_name, key_va in KEYFRAME_VA.items():
         distance = np.linalg.norm(target_va - key_va)
         
-        # --- 修正点 ----------------------------------------------------
         # 論文の式(2)  に基づき、rtop_k (weight) を計算
         # rtop_k = 1 / ((100 * d_k)^w + ε)
         weight = 1.0 / (((100 * distance) ** W) + EPSILON)
-        # -----------------------------------------------------------
         
         total_weight += weight
         weighted_params += weight * KEYFRAME_PARAMS[emotion_name]
@@ -253,12 +250,6 @@ def handle_message(data):
 
         emit("bot_stream_end", {"text": full_text.strip()})
         print(f"[Bot] {full_text.strip()}")
-
-        # --- ★ 修正点 3: 元の座標抽出ロジックは不要 ---
-        # 以下のブロックはストリーム処理に移行したため不要
-        # match = re.search(r'\((-?\d+\.?\d*),\s*(-?\d+\.?\d*)\)', full_text)
-        # if match:
-        #    ... (省略) ...
 
     except Exception as e:
         print(f"エラーが発生しました: {e}")

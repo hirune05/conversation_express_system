@@ -1,5 +1,6 @@
 import os
 import re
+import time
 import numpy as np
 from flask import Flask, render_template, send_from_directory
 from flask_socketio import SocketIO, emit
@@ -89,84 +90,40 @@ def index():
 # --- Socket.IOイベントハンドラ ---
 @socketio.on("user_message")
 def handle_message(data):
-    """ ユーザーからのメッセージを処理し、LLM 응답と表情パラメータを返す """
+    """ ユーザーからのメッセージを処理し、LLM と表情パラメータを返す """
+    start_time = time.time()  # 処理開始時間を記録
     messages = data["messages"]
     
-    # --- ★ 修正点 1: プロンプトの変更 ---
-    # 感情を「先」に出力するように指示を変更
     instruction = """あなたは、ユーザの感情を理解し、自分自身も感情を表現できる未友達ロボットです。
-    ユーザーと自然な日本語で対話してください。
+    ユーザーと自然な日本語のタメ口で対話してください。
 
     # ルール
-    1.  **感情分析 (あなた自身):** まず `EMOTION: (V, A)` という形式で**あなた自身の**感情座標を出力します。また、その座標の示す感情も一言（）で書いてください。
-    2.  **改行:** 必ず改行します。
-    3.  **対話:** ユーザーの発言に対し、感情を持ったAIとして自然な応答を返します。
-    4.  **V (快・不快):** -5.0（非常に不快）から 5.0（非常に快適）までの少数を含む連続値です。
-    5.  **A (覚醒・鎮静):** -5.0（非常に鎮静・眠い）から 5.0（非常に覚醒・興奮）までの少数を含む連続値です。
-
-    # VA座標の感情例
-    mood,valence,arousal
-    sleepy,0.05,-5.00
-    tired,-0.05,-5.00
-    afraid,-0.60,3.95
-    angry,-2.00,3.95
-    calm,3.90,-3.40
-    relaxed,3.55,-3.25
-    content,4.05,-2.75
-    depressed,-4.05,-2.40
-    discontent,-3.40,-1.60
-    determined,3.65,1.30
-    happy,4.45,0.85
-    anxious,-3.60,-4.00
-    good,4.50,-0.40
-    pensive,0.15,-3.00
-    impressed,1.95,-0.30
-    frustrated,-3.00,2.00
-    disappointed,-4.00,-0.15
-    bored,-1.75,-3.90
-    annoyed,-2.20,3.80
-    enraged,-0.90,4.15
-    excited,3.50,3.55
-    melancholy,-0.25,-3.25
-    satisfied,3.85,-3.15
-    distressed,-3.55,2.75
-    uncomfortable,-3.40,-1.85
-    worried,-0.35,-1.60
-    amused,2.75,0.95
-    apathetic,-1.00,-0.60
-    peaceful,2.75,-4.00
-    contemplative,2.90,-3.00
-    embarrassed,-1.55,-3.00
-    sad,-4.05,-2.00
-    hopeful,3.05,-1.50
-    pleased,4.45,-0.50
-
+    1.  **出力形式:** 1行目に必ず `EMOTION: (V, A) (感情名)` を出力し、改行して2行目から応答を返す。
+    2.  **感情座標:** V (快・不快) と A (覚醒・鎮静) をそれぞれ -5.0 (最小) 〜 5.0 (最大) の範囲で決める。
+    3.  **役割:** あなたは感情豊かな友達ロボットとして、自然な応答を返す。
+    
     # お手本 (AI自身の感情)
 
     ユーザー: こんにちは。
     あなた: 
-    EMOTION: (3.0, -1.5) （hopeful）
-    あ、こんにちは。えっと、よろしくお願いします。
+    EMOTION: (3.05,-1.50) （hopeful）
+    こんにちは。今日はどんな話をしようか？
 
     ユーザー: やった！ついにプロジェクトが完成したんだ！
     あなた: 
-    EMOTION: (3.5, 3.6) （excited）
-    わっ、本当ですか！すごい…！おめでとうございます！
+    EMOTION: (3.50,3.55) （excited）
+    本当！すごい！おめでとう！
 
-    ユーザー: 君は本当に役に立つね。
+    ユーザー: わぁ！君の後ろにお化けがいるよ！
     あなた: 
-    EMOTION: (4.5, 0.9) （happy）
-    ありがとうございます！そう言ってもらえると、すごく…嬉しいです。
-
-    ユーザー: このバグ、なんで直らないんだ！イライラする！
-    あなた: 
-    EMOTION: (-0.6, 4.0) （afraid）
-    ひっ…！ご、ごめんなさい。お、落ち着いてください…。
+    EMOTION: (-0.60,3.95) （afraid）
+    ひっ…！怖がらせないでよ...
 
     ユーザー: （ため息）…別に、なんでもない。
     あなた: 
-    EMOTION: (-0.4, -1.6) （worried）
-    そうですか…？なんだか心配です。"""
+    EMOTION: (-0.35,-1.60) （worried）
+    そう…？なんだか心配だけど。"""
+    
     # LLMへの指示を常にメッセージリストの先頭に追加
     messages.insert(0, {"role": "system", "content": instruction})
 
@@ -245,11 +202,10 @@ def handle_message(data):
             full_text += buffer
 
         emit("bot_stream_end", {"text": full_text.strip()})
-        print(f"[Bot] {full_text.strip()}")
+        print(f"[Bot] {full_text.strip()} (処理時間: {time.time() - start_time:.2f}秒)")
 
     except Exception as e:
         print(f"エラーが発生しました: {e}")
-        emit("error", {"message": str(e)})
 
 @socketio.on('save_data')
 def handle_save_data(data):

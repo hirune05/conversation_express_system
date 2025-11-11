@@ -36,23 +36,17 @@ EPSILON = 1e-9
 # まだ確実な数値ではない
 # ---------------------------------------------------------------------------
 KEYFRAME_PARAMS = {
-    "happy": np.array([0.25, 0.65, -10, -20, 0, 0.2, 40, 1.45, 2.5]),
-    "angry": np.array([0.9, 0.8, 5, 20, 0.15, 0.2, -15, 0.3, 0.9]),
-    "sad": np.array([0.8, 0.6, -5, -15, 0.18, 0.15, -18, 0.1, 0.8]),
-    "calm": np.array([0.15, 0.7, -13, -26, 0, 0, 12, 0.3, 1.2]),
-    "astonished": np.array([1, 0.4, 10, 25, 0.0, 0.0, 15, 3, 0.65]),
-    # "fear" -> "sleepy" に変更 
-    "sleepy": np.array([0.15, 0.75, -11, 0, 0, 0, -15, 0.7, 1.55])
+    "astonished": np.array([1, 0.65, 0, -18, 0, 0, 12, 3, 1.15]),
+    "excited": np.array([1, 0.6, 0, -18, 0, 0, 25, 1.15, 2.55]),
+    "sleepy": np.array([0.15, 0.75, -11, 0, 0, 0, -15, 0.7, 1.55]),
+    "disappointed": np.array([0.2, 0.65, -19, 0, 0, 0.03, 2, 2.5, 1.2]),
 }
-# 6感情に対応する「VA座標」
+# 4感情に対応する「VA座標」
 KEYFRAME_VA = {
-    "happy": np.array([4.45, 0.85]), 
-    "angry": np.array([-2.0, 3.95]),
-    "sad": np.array([-4.5, -2.0]), 
-    "calm": np.array([3.9, -4.0]),
-    "astonished": np.array([5.0, 0.0]), 
-    # "fear" -> "sleepy" に変更 
-    "sleepy": np.array([0.05, -5.0])
+    "astonished": np.array([5.0, 0.0]),
+    "excited": np.array([0.70, 0.71]),
+    "sleepy": np.array([0.01, -1.00]),
+    "disappointed": np.array([-0.80,-0.03]),
 }
 
 def get_interpolated_expression(target_v, target_a):
@@ -104,25 +98,25 @@ def handle_message(data):
     
     # お手本 (AI自身の感情)
 
-    ユーザー: こんにちは。
-    あなた: 
-    EMOTION: (3.05,-1.50) （hopeful）
-    こんにちは。今日はどんな話をしようか？
-
     ユーザー: やった！ついにプロジェクトが完成したんだ！
     あなた: 
-    EMOTION: (3.50,3.55) （excited）
+    EMOTION: (4.0, 4.0) (excited)
     本当！すごい！おめでとう！
 
     ユーザー: わぁ！君の後ろにお化けがいるよ！
     あなた: 
-    EMOTION: (-0.60,3.95) （afraid）
-    ひっ…！怖がらせないでよ...
+    EMOTION: (5.0, 0.0) (astonished)
+    えっ！？どこどこ！？
 
     ユーザー: （ため息）…別に、なんでもない。
     あなた: 
-    EMOTION: (-0.35,-1.60) （worried）
-    そう…？なんだか心配だけど。"""
+    EMOTION: (-4.0, -3.0) (disappointed)
+    そっか…。話したくなったら、いつでも聞くからね。
+
+    ユーザー: もう寝る時間だ。
+    あなた: 
+    EMOTION: (0.05, -5.0) (sleepy)
+    ふわぁ…おやすみ…。"""
     
     # LLMへの指示を常にメッセージリストの先頭に追加
     messages.insert(0, {"role": "system", "content": instruction})

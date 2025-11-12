@@ -80,7 +80,8 @@ def get_interpolated_expression(target_v, target_a):
     for emotion_name, key_va in KEYFRAME_VA.items():
         distance = np.linalg.norm(target_va - key_va)
         # rtop_k = 1 / ((distance)^W + ε)
-        rtop_k = 1.0 / (((distance) ** W) + EPSILON)
+        # rtop_k = 1.0 / (((distance) ** W) + EPSILON)
+        rtop_k = np.exp(- (distance ** 2))  # 距離が大きいほど小さくなるように指数関数で変換
         rtop_values.append(rtop_k)
         params_list.append(KEYFRAME_PARAMS[emotion_name])
 

@@ -1,5 +1,3 @@
-
-
 // --- グローバル変数 ---
 let staticCanvas;
 let canvasCreated = false;
@@ -188,3 +186,16 @@ function setupContext(canvas) {
 function restoreContext(original) {
   Object.keys(original).forEach(key => { window[key] = original[key]; });
 }
+
+// --- For Debugging ---
+function setExpression(v, a) {
+  if (typeof v !== 'number' || typeof a !== 'number') {
+    console.error('Usage: setExpression(v, a) where v and a are numbers between -1.0 and 1.0');
+    return;
+  }
+  console.log(`Sending manual expression update: V=${v}, A=${a}`);
+  socket.emit('manual_update_expression', { v: v, a: a });
+}
+
+// Make it accessible from the browser console
+window.setExpression = setExpression;

@@ -28,7 +28,7 @@ client = ollama.Client()
 # --- 表情計算ロジック ---
 
 # 論文  に記載されている式(2)の w の値
-W = 2.0
+W = 1.0
 # 論文  の式(2)にある ε (イプシロン) の値（ゼロ除算防止用）
 EPSILON = 1e-9 
 
@@ -41,7 +41,7 @@ KEYFRAME_PARAMS = {
     "sad": np.array([1, 0.85, 0, -18, 0.14, 0.15, -18, 0.7, 1.6]),
     "astonished": np.array([1, 0.65, 0, -18, 0, 0, 12, 3, 1.15]),
     "sleepy": np.array([0.2, 0.75, -18, 0, 0, 0, 2, 2.5, 1.2]),
-    # "relaxed": np.array([0.2, 0.75, -14, 0, 0, 0.1, 14, 0.45, 1.3])
+    "relaxed": np.array([0.2, 0.75, -14, 0, 0, 0.1, 14, 0.45, 1.3])
 }
 
 # 6感情に対応する「VA座標」
@@ -51,61 +51,66 @@ KEYFRAME_VA = {
     "sad": np.array([-0.81,-0.40]),
     "astonished": np.array([1.0, 0.0]), 
     "sleepy": np.array([0.01, -1.0]),
-    # "relaxed": np.array([0.71,-0.65])
+    "relaxed": np.array([0.71,-0.65])
 }
 
-def get_interpolated_expression(target_v, target_a):
-    """ ターゲットのVA座標に基づき、表情パラメータを補間する """
-    target_va = np.array([target_v, target_a])
-    total_weight = 0.0
-    weighted_params = np.zeros(9) # パラメータの数（元のコードに依存）
-    
-    for emotion_name, key_va in KEYFRAME_VA.items():
-        distance = np.linalg.norm(target_va - key_va)
-        
-        # 論文の式(2)  に基づき、rtop_k (weight) を計算
-        # rtop_k = 1 / ((100 * d_k)^w + ε)
-        weight = np.exp(- (0.5*distance ** 2)) 
-        
-        total_weight += weight
-        weighted_params += weight * KEYFRAME_PARAMS[emotion_name]
-    
-    final_params = weighted_params / total_weight
-        
-        
-        
 # def get_interpolated_expression(target_v, target_a):
-#     """ターゲットのVA座標に基づき、表情パラメータを補間する"""
+#     """ ターゲットのVA座標に基づき、表情パラメータを補間する """
 #     target_va = np.array([target_v, target_a])
-
-#     rtop_values = []  # 各emotionの生の重み
-#     params_list = []
-
+#     total_weight = 0.0
+#     weighted_params = np.zeros(9) # パラメータの数（元のコードに依存）
+    
 #     for emotion_name, key_va in KEYFRAME_VA.items():
 #         distance = np.linalg.norm(target_va - key_va)
-#         # rtop_k = 1 / ((distance)^W + ε)
-#         rtop_k = 1.0 / (((distance) ** W) + EPSILON)
-#         #rtop_k = np.exp(- (distance ** 2))  # 距離が大きいほど小さくなるように指数関数で変換
-#         rtop_values.append(rtop_k)
-#         params_list.append(KEYFRAME_PARAMS[emotion_name])
+        
+#         # 論文の式(2)  に基づき、rtop_k (weight) を計算
+#         # rtop_k = 1 / ((100 * d_k)^w + ε)
+#         # weight = np.exp(- (0.5*distance ** 2)) 
+#         weight = 1.0 / (((100*distance) ** W) + EPSILON)
+        
+#         total_weight += weight
+#         weighted_params += weight * KEYFRAME_PARAMS[emotion_name]
+    
+#     final_params = weighted_params / total_weight
+        
+        
+        
+def get_interpolated_expression(target_v, target_a):
+    """ターゲットのVA座標に基づき、表情パラメータを補間する"""
+    target_va = np.array([target_v, target_a])
 
-#     # ===== ソフトマックス正規化 =====
-#     rtop_values = np.array(rtop_values)
-#     exp_rtop = np.exp(rtop_values - np.max(rtop_values))  # 安定化
-#     softmax_weights = exp_rtop / np.sum(exp_rtop)
+    rtop_values = []  # 各emotionの生の重み
+    params_list = []
 
-#     # ===== 重み付き平均 =====
-#     final_params = np.zeros(9)
-#     for w, p in zip(softmax_weights, params_list):
-#         final_params += w * p
+    for emotion_name, key_va in KEYFRAME_VA.items():
+        distance = np.linalg.norm(target_va - key_va)
+        # rtop_k = 1 / ((distance)^W + ε)
+        rtop_k = 1.0 / (((distance) ** W) + EPSILON)
+        #rtop_k = np.exp(- (distance ** 2))  # 距離が大きいほど小さくなるように指数関数で変換
+        rtop_values.append(rtop_k)
+        params_list.append(KEYFRAME_PARAMS[emotion_name])
+
+    # ===== ソフトマックス正規化 =====
+    rtop_values = np.array(rtop_values)
+    # exp_rtop = np.exp(rtop_values - np.max(rtop_values))  # 安定化
+    # softmax_weights = exp_rtop / np.sum(exp_rtop)
+    T = 1.5  # 温度パラメータ
+    # 安定化 & 温度スケーリング
+    exp_rtop = np.exp((rtop_values - np.max(rtop_values)) / T)
+    softmax_weights = exp_rtop / np.sum(exp_rtop)
+
+    # ===== 重み付き平均 =====
+    final_params = np.zeros(9)
+    for w, p in zip(softmax_weights, params_list):
+        final_params += w * p
     
     
     # ===== ここまで! =====
-    if final_params[0] >= 0.4: final_params[0] = 1.0
-    else: final_params[0] = 0.2
+    # if final_params[0] >= 0.8: final_params[0] = 1.0
+    # else: final_params[0] = 0.2
 
-    if final_params[4] < 0.1:
-        final_params[4] = 0
+    # if final_params[4] < 0.1:
+    #     final_params[4] = 0
         
     print(f"--- 補間結果: V={target_v}, A={target_a} -> Params={final_params} ---")
     return final_params

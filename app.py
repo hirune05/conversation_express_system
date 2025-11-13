@@ -81,6 +81,8 @@ def get_interpolated_expression(target_v, target_a):
 
     rtop_values = []  # 各emotionの生の重み
     params_list = []
+    emotion_names = []
+    
 
     for emotion_name, key_va in KEYFRAME_VA.items():
         distance = np.linalg.norm(target_va - key_va)
@@ -89,6 +91,7 @@ def get_interpolated_expression(target_v, target_a):
         #rtop_k = np.exp(- (distance ** 2))  # 距離が大きいほど小さくなるように指数関数で変換
         rtop_values.append(rtop_k)
         params_list.append(KEYFRAME_PARAMS[emotion_name])
+        emotion_names.append(emotion_name)
 
     # ===== ソフトマックス正規化 =====
     rtop_values = np.array(rtop_values)
@@ -98,6 +101,14 @@ def get_interpolated_expression(target_v, target_a):
     # 安定化 & 温度スケーリング
     exp_rtop = np.exp((rtop_values - np.max(rtop_values)) / T)
     softmax_weights = exp_rtop / np.sum(exp_rtop)
+
+    print(f"\n=== V={target_v}, A={target_a} の重み分析 ===")
+    print(f"{'感情':<10} | {'距離':<8} | {'生の重み':<11} | {'ソフトマックス %':<15}")
+    print("-" * 65)
+    for i, emotion_name in enumerate(emotion_names):
+        distance = np.linalg.norm(target_va - KEYFRAME_VA[emotion_name])
+        print(f"{emotion_name:<12} | {distance:<10.4f} | {rtop_values[i]:<15.6f} | {softmax_weights[i]*100:<15.2f}%")
+    print("=" * 65 + "\n")
 
     # ===== 重み付き平均 =====
     final_params = np.zeros(9)
@@ -112,7 +123,17 @@ def get_interpolated_expression(target_v, target_a):
     # if final_params[4] < 0.1:
     #     final_params[4] = 0
         
-    print(f"--- 補間結果: V={target_v}, A={target_a} -> Params={final_params} ---")
+    print(f"--- 補間結果: V={target_v}, A={target_a} ---")
+    param_names = [
+    "eyeOpenness", "pupilSize", "pupilAngle", "upperEyelidAngle",
+    "upperEyelidCoverage", "lowerEyelidCoverage", "mouthCurve",
+    "mouthHeight", "mouthWidth"
+    ]
+    print(f"{'Parameter':<20} | {'Value':<12}")
+    print("-" * 35)
+    for name, value in zip(param_names, final_params):
+        print(f"{name:<20} | {value:<12.4f}")
+    print("=" * 35 + "\n")
     return final_params
     
 

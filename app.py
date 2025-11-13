@@ -50,7 +50,7 @@ KEYFRAME_VA = {
     "happy": np.array([0.89,0.17]), 
     "angry": np.array([-0.40,0.79]),
     "sad": np.array([-0.81,-0.40]),
-    "astonished": np.array([1.0, 0.0]), 
+    "astonished": np.array([0.0, 1.0]), 
     "sleepy": np.array([0.01, -1.0]),
     "relaxed": np.array([0.71,-0.65])
 }

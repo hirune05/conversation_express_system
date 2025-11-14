@@ -88,7 +88,7 @@ def get_interpolated_expression(target_v, target_a):
     for emotion_name, key_va in KEYFRAME_VA.items():
         distance = np.linalg.norm(target_va - key_va)
         # rtop_k = 1 / ((distance)^W + ε)
-        rtop_k = 1.0 / (((distance) ** W) + EPSILON)
+        rtop_k = 1.0 / (((distance)) + EPSILON)
         #rtop_k = np.exp(- (distance ** 2))  # 距離が大きいほど小さくなるように指数関数で変換
         rtop_values.append(rtop_k)
         params_list.append(KEYFRAME_PARAMS[emotion_name])
@@ -98,7 +98,7 @@ def get_interpolated_expression(target_v, target_a):
     rtop_values = np.array(rtop_values)
     # exp_rtop = np.exp(rtop_values - np.max(rtop_values))  # 安定化
     # softmax_weights = exp_rtop / np.sum(exp_rtop)
-    T = 1.5  # 温度パラメータ
+    T = 1  # 温度パラメータ
     # 安定化 & 温度スケーリング
     exp_rtop = np.exp((rtop_values - np.max(rtop_values)) / T)
     softmax_weights = exp_rtop / np.sum(exp_rtop)
@@ -111,48 +111,53 @@ def get_interpolated_expression(target_v, target_a):
         print(f"{emotion_name:<12} | {distance:<10.4f} | {rtop_values[i]:<15.6f} | {softmax_weights[i]*100:<15.2f}%")
     print("=" * 65 + "\n")
     
-    # ===== 重み付き平均 =====
-    final_params = np.zeros(9)
+#     # ===== 重み付き平均 =====
+#     final_params = np.zeros(9)
+#     for w, p in zip(softmax_weights, params_list):
+#         final_params += w * p
+
+    # ===== 重み付き平均 (ファジーロジック適用) =====
+
+    # --- 1. eyeOpenness 以外の8パラメータを計算 (従来通りの加重平均) ---
+    final_params_8 = np.zeros(8)
     for w, p in zip(softmax_weights, params_list):
-        final_params += w * p
+        final_params_8 += w * p[1:]  # インデックス1以降の8要素を使用
 
-    # # ===== 重み付き平均 (ファジーロジック適用) =====
+    # --- 2. eyeOpenness (インデックス0) のみファジーロジックで計算 ---
 
-    # # --- 1. eyeOpenness 以外の8パラメータを計算 (従来通りの加重平均) ---
-    # final_params_8 = np.zeros(8)
-    # for w, p in zip(softmax_weights, params_list):
-    #     final_params_8 += w * p[1:]  # インデックス1以降の8要素を使用
+    # 感情名と重みの辞書を作成 (後の計算用)
+    weights_dict = {name: weight for name, weight in zip(emotion_names, softmax_weights)}
 
-    # # --- 2. eyeOpenness (インデックス0) のみファジーロジックで計算 ---
+    # 「開」グループ (KEYFRAME_PARAMS[emotion][0] == 1.0 のもの)
+    Wide_Score = weights_dict.get("happy", 0) + weights_dict.get("angry", 0) + \
+                 weights_dict.get("sad", 0) + weights_dict.get("astonished", 0)
 
-    # # 感情名と重みの辞書を作成 (後の計算用)
-    # weights_dict = {name: weight for name, weight in zip(emotion_names, softmax_weights)}
+    # 「閉」グループ (KEYFRAME_PARAMS[emotion][0] == 0.2 のもの)
+    Narrow_Score = weights_dict.get("sleepy", 0) + weights_dict.get("relaxed", 0)
 
-    # # 「開」グループ (KEYFRAME_PARAMS[emotion][0] == 1.0 のもの)
-    # Wide_Score = weights_dict.get("happy", 0) + weights_dict.get("angry", 0) + \
-    #              weights_dict.get("sad", 0) + weights_dict.get("astonished", 0)
+    # 「開」と「閉」のどちらが優勢か
+    Score = Wide_Score - Narrow_Score
 
-    # # 「閉」グループ (KEYFRAME_PARAMS[emotion][0] == 0.2 のもの)
-    # Narrow_Score = weights_dict.get("sleepy", 0) + weights_dict.get("relaxed", 0)
+    # ゲイン k (この値で「寄せ具合」を調整。大きいほど0か1に振り切れる)
+    k = 15  
 
-    # # 「開」と「閉」のどちらが優勢か
-    # Score = Wide_Score - Narrow_Score
+    # シグモイド関数
+    # Score がプラス (Wide優勢) なら 1.0 に、マイナス (Narrow優勢) なら 0.0 に近づく
+    sigmoid_output = 1.0 / (1.0 + math.exp(-k * Score))
+    
+    # スコアとkの値を表示
+    print(f"--- eyeOpenness ファジースコア計算 ---")
+    print(f"Wide_Score: {Wide_Score:.4f}, Narrow_Score: {Narrow_Score:.4f}, Score: {Score:.4f}")
+    print(f"Sigmoid出力: {sigmoid_output:.4f}")
 
-    # # ゲイン k (この値で「寄せ具合」を調整。大きいほど0か1に振り切れる)
-    # k = 10.0  
+    # ターゲットの eyeOpenness を 0.2 から 1.0 の間でマッピングする
+    MIN_OPENNESS = 0.2
+    MAX_OPENNESS = 1.0
+    # sigmoid_output が 0.0 なら 0.2 に、1.0 なら 1.0 になる
+    target_eyeOpenness = MIN_OPENNESS + (MAX_OPENNESS - MIN_OPENNESS) * sigmoid_output
 
-    # # シグモイド関数
-    # # Score がプラス (Wide優勢) なら 1.0 に、マイナス (Narrow優勢) なら 0.0 に近づく
-    # sigmoid_output = 1.0 / (1.0 + math.exp(-k * Score))
-
-    # # ターゲットの eyeOpenness を 0.2 から 1.0 の間でマッピングする
-    # MIN_OPENNESS = 0.2
-    # MAX_OPENNESS = 1.0
-    # # sigmoid_output が 0.0 なら 0.2 に、1.0 なら 1.0 になる
-    # target_eyeOpenness = MIN_OPENNESS + (MAX_OPENNESS - MIN_OPENNESS) * sigmoid_output
-
-    # # --- 3. 最終パラメータを結合 ---
-    # final_params = np.concatenate(([target_eyeOpenness], final_params_8))
+    # --- 3. 最終パラメータを結合 ---
+    final_params = np.concatenate(([target_eyeOpenness], final_params_8))
     
     # ===== ここまで! =====
     # if final_params[0] >= 0.8: final_params[0] = 1.0

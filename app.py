@@ -26,6 +26,21 @@ socketio = SocketIO(app, cors_allowed_origins="*")
 # --- Ollamaの初期化 ---
 client = ollama.Client()
 
+# --- 時間計測用表示関数 ---
+def print_timing_table(total_time, llm_time, param_time):
+    """処理時間を表形式で出力する"""
+    print("\n" + "="*50)
+    print("           処理時間計測結果")
+    print("="*50)
+    print(f"{'項目':<20} | {'時間(秒)':<10} | {'割合(%)':<8}")
+    print("-"*50)
+    print(f"{'全体処理時間':<20} | {total_time:<10.4f} | {'100.0':<8}")
+    print(f"{'LLM応答生成':<20} | {llm_time:<10.4f} | {(llm_time/total_time*100 if total_time > 0 else 0):<8.1f}")
+    print(f"{'パラメータ計算':<20} | {param_time:<10.4f} | {(param_time/total_time*100 if total_time > 0 else 0):<8.1f}")
+    other_time = total_time - llm_time - param_time
+    print(f"{'その他処理':<20} | {other_time:<10.4f} | {(other_time/total_time*100 if total_time > 0 else 0):<8.1f}")
+    print("="*50 + "\n")
+
 # --- 表情計算ロジック ---
 
 # 論文  に記載されている式(2)の w の値
@@ -73,7 +88,34 @@ KEYFRAME_VA = {
 #         weighted_params += weight * KEYFRAME_PARAMS[emotion_name]
     
 #     final_params = weighted_params / total_weight
-        
+       
+# def get_interpolated_expression(target_v, target_a):
+#     """ ターゲットのVA座標に基づき、表情パラメータを補間する """
+#     target_va = np.array([target_v, target_a])
+
+#     weights = {}  # 各感情の rtop_k を記録（式2）
+    
+#     # --- まず rtop_k を全て求める ---
+#     for emotion_name, key_va in KEYFRAME_VA.items():
+#         distance = np.linalg.norm(target_va - key_va)
+
+#         rtop_k = 1.0 / (((100 * distance) ** W) + EPSILON)
+#         weights[emotion_name] = rtop_k
+
+#     # --- 次に r_k を求める（式1の正規化） ---
+#     total_rtop = sum(weights.values())
+#     r_values = {name: w / total_rtop for name, w in weights.items()}
+
+#     # ★ ここで r_k を print ★
+#     print("=== r_k values (emotion weights) ===")
+#     for name, r in r_values.items():
+#         print(f"{name}: {r}")
+
+#     # --- 最後に式(3)の p を求める ---
+#     final_params = np.zeros(9)
+#     for emotion_name, r_k in r_values.items():
+#         final_params += r_k * KEYFRAME_PARAMS[emotion_name]
+ 
         
         
 def get_interpolated_expression(target_v, target_a):
@@ -103,70 +145,104 @@ def get_interpolated_expression(target_v, target_a):
     exp_rtop = np.exp((rtop_values - np.max(rtop_values)) / T)
     softmax_weights = exp_rtop / np.sum(exp_rtop)
 
+
     print(f"\n=== V={target_v}, A={target_a} の重み分析 ===")
-    print(f"{'感情':<10} | {'距離':<8} | {'生の重み':<11} | {'ソフトマックス %':<15}")
+    print(f"{'感情':<10} | {'距離':<8} | {'rtop_k':<11} | {'r_k (softmax)':<15}")
     print("-" * 65)
     for i, emotion_name in enumerate(emotion_names):
         distance = np.linalg.norm(target_va - KEYFRAME_VA[emotion_name])
-        print(f"{emotion_name:<12} | {distance:<10.4f} | {rtop_values[i]:<15.6f} | {softmax_weights[i]*100:<15.2f}%")
+        print(f"{emotion_name:<12} | {distance:<10.4f} | {rtop_values[i]:<15.6f} | {softmax_weights[i]:<15.6f}")
     print("=" * 65 + "\n")
     
-#     # ===== 重み付き平均 =====
-#     final_params = np.zeros(9)
-#     for w, p in zip(softmax_weights, params_list):
-#         final_params += w * p
+    # ========================
+    #     r_k の表示部分
+    # ========================
+    print("\n=== r_k values (emotion weights, normalized) ===")
+    for name, rk in zip(emotion_names, softmax_weights):   # ← rk_values は不要
+        print(f"{name}: {rk}")   # 桁数多めで表示
+    print("===============================================\n")
+    
+    # # ===== 重み付き平均 =====
+    # final_params = np.zeros(9)
+    # for w, p in zip(softmax_weights, params_list):
+    #     final_params += w * p
 
-    # ===== 重み付き平均 (ファジーロジック適用) =====
-
-    # --- 1. eyeOpenness 以外の8パラメータを計算 (従来通りの加重平均) ---
-    final_params_8 = np.zeros(8)
+    # ===== 1. 従来の重み付き平均 (ベース計算) =====
+    # まず、全9パラメータを従来の加重平均で計算する
+    final_params = np.zeros(9)
     for w, p in zip(softmax_weights, params_list):
-        final_params_8 += w * p[1:]  # インデックス1以降の8要素を使用
+        final_params += w * p
 
-    # --- 2. eyeOpenness (インデックス0) のみファジーロジックで計算 ---
+    # ベースとなる値（ファジー適用前）を保持
+    base_eyeOpenness = final_params[0]
+    base_upperEyelidCoverage = final_params[4]
+
+    print(f"--- ベース補間結果 (ファジー適用前) ---")
+    print(f"Base eyeOpenness: {base_eyeOpenness:.4f}")
+    print(f"Base upperEyelidCoverage: {base_upperEyelidCoverage:.4f}")
+    print("-" * 35)
+
+
+    # ===== 2. ファジー制御による上書き =====
 
     # 感情名と重みの辞書を作成 (後の計算用)
     weights_dict = {name: weight for name, weight in zip(emotion_names, softmax_weights)}
 
-    # 「開」グループ (KEYFRAME_PARAMS[emotion][0] == 1.0 のもの)
+    # --- 2a. eyeOpenness (インデックス0) の上書き ---
     Wide_Score = weights_dict.get("happy", 0) + weights_dict.get("angry", 0) + \
                  weights_dict.get("sad", 0) + weights_dict.get("astonished", 0)
-
-    # 「閉」グループ (KEYFRAME_PARAMS[emotion][0] == 0.2 のもの)
     Narrow_Score = weights_dict.get("sleepy", 0) + weights_dict.get("relaxed", 0)
-
-    # 「開」と「閉」のどちらが優勢か
     Score = Wide_Score - Narrow_Score
-
-    # ゲイン k (この値で「寄せ具合」を調整。大きいほど0か1に振り切れる)
-    k = 15  
-
-    # シグモイド関数
-    # Score がプラス (Wide優勢) なら 1.0 に、マイナス (Narrow優勢) なら 0.0 に近づく
-    sigmoid_output = 1.0 / (1.0 + math.exp(-k * Score))
+    k = 15.0 
+    sigmoid_output_eye = 1.0 / (1.0 + math.exp(-k * Score))
     
-    # スコアとkの値を表示
-    print(f"--- eyeOpenness ファジースコア計算 ---")
-    print(f"Wide_Score: {Wide_Score:.4f}, Narrow_Score: {Narrow_Score:.4f}, Score: {Score:.4f}")
-    print(f"Sigmoid出力: {sigmoid_output:.4f}")
-
-    # ターゲットの eyeOpenness を 0.2 から 1.0 の間でマッピングする
     MIN_OPENNESS = 0.2
     MAX_OPENNESS = 1.0
-    # sigmoid_output が 0.0 なら 0.2 に、1.0 なら 1.0 になる
-    target_eyeOpenness = MIN_OPENNESS + (MAX_OPENNESS - MIN_OPENNESS) * sigmoid_output
-
-    # --- 3. 最終パラメータを結合 ---
-    final_params = np.concatenate(([target_eyeOpenness], final_params_8))
+    target_eyeOpenness = MIN_OPENNESS + (MAX_OPENNESS - MIN_OPENNESS) * sigmoid_output_eye
     
-    # ===== ここまで! =====
-    # if final_params[0] >= 0.8: final_params[0] = 1.0
-    # else: final_params[0] = 0.2
+    # final_params のインデックス0 を上書き
+    final_params[0] = target_eyeOpenness
 
-    # if final_params[4] < 0.1:
-    #     final_params[4] = 0
-        
-    print(f"--- 補間結果: V={target_v}, A={target_a} ---")
+    # --- 2b. upperEyelidCoverage (インデックス4) の上書き (ハイブリッド方式) ---
+    
+        # --- ゲート(ON/OFF)の計算 ---
+    # 「被る」グループの重みの合計を計算
+    w_angry = weights_dict.get("angry", 0)
+    w_sad = weights_dict.get("sad", 0)
+    Cover_Score = w_angry + w_sad
+
+    # 「被らない」グループの重みの合計を計算
+    No_Cover_Score = weights_dict.get("happy", 0) + weights_dict.get("astonished", 0) + \
+                     weights_dict.get("sleepy", 0) + weights_dict.get("relaxed", 0)
+    
+    # 「被る」と「被らない」のどちらが優勢か
+    Score_coverage = Cover_Score - No_Cover_Score
+
+    # ゲイン k (大きいほど急激に 0.0 か 1.0 に振り切れる)
+    k_coverage = 15.0
+
+    # シグモイド関数 (ゲートの開閉度: 0.0～1.0)
+    # Score がプラス (Cover優勢) なら 1.0 に、マイナス (No_Cover優勢) なら 0.0 に近づく
+    sigmoid_gate = 1.0 / (1.0 + math.exp(-k_coverage * Score_coverage))
+    
+    # --- 最終的な値の決定 ---
+    # target = ゲート(0 or 1) * 目標値(Base値)
+    # これにより、「微妙な値」はゲートが0.0になり消滅し、
+    # 「意図した値」はゲートが1.0になりそのまま使われる。
+    target_coverage = sigmoid_gate * base_upperEyelidCoverage
+    
+    print(f"--- upperEyelidCoverage ファジー計算 (ゲート * Base値 方式) ---")
+    print(f"Cover_Score: {Cover_Score:.4f}, No_Cover_Score: {No_Cover_Score:.4f}, Score: {Score_coverage:.4f}")
+    print(f"Sigmoid出力 (ゲート): {sigmoid_gate:.4f}")
+    print(f"目標値 (Base値): {base_upperEyelidCoverage:.4f}")
+    print(f"target_coverage (出力): {target_coverage:.4f}")
+
+    # final_params のインデックス4 を上書き
+    final_params[4] = target_coverage
+
+
+    # ===== 3. 最終結果の表示 =====
+    print(f"\n--- 補間結果 (ファジー適用後): V={target_v}, A={target_a} ---")
     param_names = [
     "eyeOpenness", "pupilSize", "pupilAngle", "upperEyelidAngle",
     "upperEyelidCoverage", "lowerEyelidCoverage", "mouthCurve",
@@ -174,8 +250,13 @@ def get_interpolated_expression(target_v, target_a):
     ]
     print(f"{'Parameter':<20} | {'Value':<12}")
     print("-" * 35)
-    for name, value in zip(param_names, final_params):
-        print(f"{name:<20} | {value:<12.4f}")
+    for i, (name, value) in enumerate(zip(param_names, final_params)):
+        if i == 0:
+            print(f"{name:<20} | {value:<12.4f}  <-- ファジー制御 (EyeOpen)")
+        elif i == 4:
+            print(f"{name:<20} | {value:<12.4f}  <-- ファジー制御 (EyelidCov)")
+        else:
+            print(f"{name:<20} | {value:<12.4f}")
     print("=" * 35 + "\n")
     return final_params
     
@@ -190,7 +271,11 @@ def index():
 @socketio.on("user_message")
 def handle_message(data):
     """ ユーザーからのメッセージを処理し、LLM と表情パラメータを返す """
-    start_time = time.time()  # 処理開始時間を記録
+    start_time = time.time()  # 全体処理開始時間を記録
+    llm_start_time = None     # LLM処理開始時間
+    llm_end_time = None       # LLM処理終了時間
+    param_start_time = None   # パラメータ計算開始時間
+    param_end_time = None     # パラメータ計算終了時間
     messages = data["messages"]
     
     instruction = """あなたは、ユーザの感情を理解し、自分自身も感情を表現できる未友達ロボットです。
@@ -229,6 +314,7 @@ def handle_message(data):
     print(f"[User] {messages[-1]['content']}")
 
     try:
+        llm_start_time = time.time()  # LLM処理開始時間を記録
         response = client.chat(model=LLM_MODEL, messages=messages, stream=True)
         
         full_text = ""
@@ -255,7 +341,9 @@ def handle_message(data):
                         a_val = float(match.group(2))
                         print(f"--- 座標を検出 (ストリーム中): V={v_val}, A={a_val} ---")
                         
+                        param_start_time = time.time()  # パラメータ計算開始時間を記録
                         params = get_interpolated_expression(v_val, a_val)
+                        param_end_time = time.time()    # パラメータ計算終了時間を記録
                         param_names = [
                             "eyeOpenness", "pupilSize", "pupilAngle", "upperEyelidAngle", 
                             "upperEyelidCoverage", "lowerEyelidCoverage", "mouthCurve", 
@@ -292,6 +380,7 @@ def handle_message(data):
                     full_text += subtext
 
         # ストリーム終了処理
+        llm_end_time = time.time()  # LLM処理終了時間を記録
         
         # バッファにテキストが残っている (＝EMOTIONが見つからないまま終わった)
         if not emotion_sent and buffer:
@@ -301,7 +390,15 @@ def handle_message(data):
             full_text += buffer
 
         emit("bot_stream_end", {"text": full_text.strip()})
-        print(f"[Bot] {full_text.strip()} (処理時間: {time.time() - start_time:.2f}秒)")
+        
+        # 処理時間を表形式で出力
+        end_time = time.time()
+        total_time = end_time - start_time
+        llm_time = llm_end_time - llm_start_time if llm_start_time and llm_end_time else 0
+        param_time = param_end_time - param_start_time if param_start_time and param_end_time else 0
+        
+        print_timing_table(total_time, llm_time, param_time)
+        print(f"[Bot] {full_text.strip()}")
 
     except Exception as e:
         print(f"エラーが発生しました: {e}")

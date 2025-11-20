@@ -12,7 +12,7 @@ let rightAnimationDuration = 1000;
 
 // --- Socket.IO関連 ---
 const socket = io("http://127.0.0.1:5000");
-let messages = []; // チャット履歴を保持
+// let messages = []; // チャット履歴を保持（コメントアウト：履歴を無効化）
 
 // --- p5.js setup ---
 function setup() {
@@ -83,7 +83,7 @@ function setupSocketListeners() {
   });
 
   socket.on("bot_stream_end", (data) => {
-    messages.push({ role: "assistant", content: data.text });
+    // messages.push({ role: "assistant", content: data.text }); // コメントアウト：履歴を無効化
     botMessageDiv = null; // リセット
   });
 
@@ -124,9 +124,10 @@ function sendMessage() {
   if (text === "") return;
 
   addMessageToHistory(text, "user-message");
-  messages.push({ role: "user", content: text });
+  // messages.push({ role: "user", content: text }); // コメントアウト：履歴を無効化
 
-  socket.emit("user_message", { messages: messages });
+  // socket.emit("user_message", { messages: messages }); // コメントアウト：履歴送信を無効化
+  socket.emit("user_message", { messages: [{ role: "user", content: text }] }); // 現在のメッセージのみ送信
 
   input.value = "";
 }

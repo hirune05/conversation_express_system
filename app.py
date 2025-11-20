@@ -308,10 +308,13 @@ def handle_message(data):
     EMOTION: (0.01, -1.0) (sleepy)
     ふわぁ…おやすみ…。"""
     
-    # LLMへの指示を常にメッセージリストの先頭に追加
-    messages.insert(0, {"role": "system", "content": instruction})
+    # 会話履歴を無効化：現在のメッセージのみをLLMに送信
+    # messages.insert(0, {"role": "system", "content": instruction}) # コメントアウト：履歴使用を無効化
+    # 現在のメッセージのみでLLMに送信
+    current_message = messages[-1]['content'] if messages else ""
+    messages = [{"role": "system", "content": instruction}, {"role": "user", "content": current_message}]
 
-    print(f"[User] {messages[-1]['content']}")
+    print(f"[User] {current_message}") # 履歴なしで現在のメッセージのみ表示
 
     try:
         llm_start_time = time.time()  # LLM処理開始時間を記録

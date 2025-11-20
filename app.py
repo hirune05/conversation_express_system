@@ -26,20 +26,52 @@ socketio = SocketIO(app, cors_allowed_origins="*")
 # --- Ollamaの初期化 ---
 client = ollama.Client()
 
-# --- 時間計測用表示関数 ---
-def print_timing_table(total_time, llm_time, param_time):
-    """処理時間を表形式で出力する"""
-    print("\n" + "="*50)
-    print("           処理時間計測結果")
-    print("="*50)
-    print(f"{'項目':<20} | {'時間(秒)':<10} | {'割合(%)':<8}")
-    print("-"*50)
-    print(f"{'全体処理時間':<20} | {total_time:<10.4f} | {'100.0':<8}")
-    print(f"{'LLM応答生成':<20} | {llm_time:<10.4f} | {(llm_time/total_time*100 if total_time > 0 else 0):<8.1f}")
-    print(f"{'パラメータ計算':<20} | {param_time:<10.4f} | {(param_time/total_time*100 if total_time > 0 else 0):<8.1f}")
-    other_time = total_time - llm_time - param_time
-    print(f"{'その他処理':<20} | {other_time:<10.4f} | {(other_time/total_time*100 if total_time > 0 else 0):<8.1f}")
-    print("="*50 + "\n")
+# CSVファイルパス（時間計測用）
+TIMING_CSV_FILE = 'timing_data.csv'
+TIMING_CSV_HEADERS = ['timestamp', 'total_time', 'llm_time', 'param_time']
+
+# --- 時間計測用CSV出力関数 ---
+def save_timing_to_csv(total_time, llm_time, param_time):
+    """処理時間をCSVファイルに保存する"""
+    import datetime
+    
+    # ファイルが存在しない場合はヘッダーを書き込む
+    file_exists = os.path.isfile(TIMING_CSV_FILE)
+    
+    try:
+        with open(TIMING_CSV_FILE, 'a', newline='', encoding='utf-8') as f:
+            writer = csv.DictWriter(f, fieldnames=TIMING_CSV_HEADERS)
+            
+            if not file_exists:
+                writer.writeheader()
+            
+            # データを書き込み
+            writer.writerow({
+                'timestamp': datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
+                'total_time': round(total_time, 4),
+                'llm_time': round(llm_time, 4), 
+                'param_time': round(param_time, 4)
+            })
+            
+        print(f"CSV保存成功: {TIMING_CSV_FILE} - 全体:{total_time:.4f}s, LLM:{llm_time:.4f}s, パラメータ:{param_time:.4f}s")
+        
+    except Exception as e:
+        print(f"CSV保存エラー: {e}")
+
+# 既存の表示関数（コメントアウト）
+# def print_timing_table(total_time, llm_time, param_time):
+#     """処理時間を表形式で出力する"""
+#     print("\n" + "="*50)
+#     print("           処理時間計測結果")
+#     print("="*50)
+#     print(f"{'項目':<20} | {'時間(秒)':<10} | {'割合(%)':<8}")
+#     print("-"*50)
+#     print(f"{'全体処理時間':<20} | {total_time:<10.4f} | {'100.0':<8}")
+#     print(f"{'LLM応答生成':<20} | {llm_time:<10.4f} | {(llm_time/total_time*100 if total_time > 0 else 0):<8.1f}")
+#     print(f"{'パラメータ計算':<20} | {param_time:<10.4f} | {(param_time/total_time*100 if total_time > 0 else 0):<8.1f}")
+#     other_time = total_time - llm_time - param_time
+#     print(f"{'その他処理':<20} | {other_time:<10.4f} | {(other_time/total_time*100 if total_time > 0 else 0):<8.1f}")
+#     print("="*50 + "\n")
 
 # --- 表情計算ロジック ---
 
@@ -400,7 +432,8 @@ def handle_message(data):
         llm_time = llm_end_time - llm_start_time if llm_start_time and llm_end_time else 0
         param_time = param_end_time - param_start_time if param_start_time and param_end_time else 0
         
-        print_timing_table(total_time, llm_time, param_time)
+        # print_timing_table(total_time, llm_time, param_time) # コメントアウト：表示をCSV出力に変更
+        save_timing_to_csv(total_time, llm_time, param_time) # CSVに時間データを保存
         print(f"[Bot] {full_text.strip()}")
 
     except Exception as e:

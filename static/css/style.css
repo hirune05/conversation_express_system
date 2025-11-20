@@ -42,6 +42,7 @@ button:hover {
 
 #main-container {
   display: flex;
+  flex-direction: row;
   gap: 30px;
   align-items: flex-start;
   margin: 20px 0;

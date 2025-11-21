@@ -296,7 +296,7 @@ def handle_message(data):
 
     ユーザー: わぁ！君の後ろにお化けがいるよ！
     あなた: 
-    EMOTION: (1.0, 0.0) (astonished)
+    EMOTION: (0.0, 1.0) (astonished)
     えっ！？どこどこ！？
 
     ユーザー: （ため息）…別に、なんでもない。

@@ -279,11 +279,11 @@ def handle_message(data):
     messages = data["messages"]
     emotion_line = None  # EMOTION行を保存する変数
     
-    instruction = """あなたは、ユーザの感情を理解し、自分自身も感情を表現できる未友達ロボットです。
-    ユーザーと自然な日本語のタメ口で対話してください。
+    instruction = """あなたは、ユーザの感情を理解し、自分自身も感情を豊かに表現できる友達ロボットです。
+    ユーザーと自然な日本語のタメ口で対話し，応答に相応しいあなた自身の感情を感情座標を用いて表現してください。
 
     # ルール
-    1.  **出力形式:** 1行目に必ず `EMOTION: (V, A) (感情名)` を出力し、改行して2行目から応答を返す。
+    1.  **出力形式:** 1行目に必ず `EMOTION: (V, A) (感情名)` を少数代2位まで出力し、改行して2行目から応答を返す。
     2.  **感情座標:** V (快・不快) と A (覚醒・鎮静) をそれぞれ -1.0 (最小) 〜 1.0 (最大) の範囲で決める。
     3.  **役割:** あなたは感情豊かな友達ロボットとして、自然な応答を返す。
     
@@ -313,6 +313,16 @@ def handle_message(data):
     messages.insert(0, {"role": "system", "content": instruction})
 
     print(f"[User] {messages[-1]['content']}")
+    
+    # デバッグ: 履歴の中身を確認
+    print(f"\n--- メッセージ履歴の確認 (件数: {len(messages)}) ---")
+    for i, msg in enumerate(messages):
+        if msg['role'] == 'system':
+            print(f"{i}: system - [インストラクション省略]")
+        else:
+            content_display = msg['content'].replace('\n', '\\n')
+            print(f"{i}: {msg['role']} - {content_display}")
+    print("--- 履歴確認終了 ---\n")
 
     try:
         llm_start_time = time.time()  # LLM処理開始時間を記録

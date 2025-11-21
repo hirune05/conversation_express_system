@@ -14,6 +14,12 @@ let rightAnimationDuration = 1000;
 const socket = io("http://127.0.0.1:5000");
 // let messages = []; // チャット履歴を保持（コメントアウト：履歴を無効化）
 
+// --- 自動テスト関連変数 ---
+let autoTestRunning = false;
+let autoTestCount = 0;
+let autoTestMaxCount = 50;
+let autoTestTimeoutId = null;
+
 // --- p5.js setup ---
 function setup() {
   let mainCanvas = createCanvas(1, 1);
@@ -63,6 +69,10 @@ function setupUIListeners() {
       sendMessage();
     }
   });
+
+  // 自動テストボタン
+  document.getElementById("auto-test-start").addEventListener("click", startAutoTest);
+  document.getElementById("auto-test-stop").addEventListener("click", stopAutoTest);
 }
 
 // --- Socket.IOリスナー設定 ---
@@ -85,6 +95,11 @@ function setupSocketListeners() {
   socket.on("bot_stream_end", (data) => {
     // messages.push({ role: "assistant", content: data.text }); // コメントアウト：履歴を無効化
     botMessageDiv = null; // リセット
+    
+    // 自動テスト中の場合、次のメッセージを自動送信
+    if (autoTestRunning) {
+      scheduleNextAutoMessage();
+    }
   });
 
   socket.on("update_expression", (params) => {
@@ -281,3 +296,71 @@ function setExpression(v, a) {
 
 // Make it accessible from the browser console
 window.setExpression = setExpression;
+
+// --- 自動テスト機能 ---
+function startAutoTest() {
+  autoTestRunning = true;
+  autoTestCount = 0;
+  
+  // ボタンの状態を更新
+  document.getElementById("auto-test-start").disabled = true;
+  document.getElementById("auto-test-stop").disabled = false;
+  
+  // ステータス表示を更新
+  updateAutoTestStatus();
+  
+  // 最初のメッセージを送信
+  sendAutoMessage();
+}
+
+function stopAutoTest() {
+  autoTestRunning = false;
+  
+  // タイムアウトをクリア
+  if (autoTestTimeoutId) {
+    clearTimeout(autoTestTimeoutId);
+    autoTestTimeoutId = null;
+  }
+  
+  // ボタンの状態を更新
+  document.getElementById("auto-test-start").disabled = false;
+  document.getElementById("auto-test-stop").disabled = true;
+  
+  // ステータス表示を更新
+  updateAutoTestStatus();
+}
+
+function sendAutoMessage() {
+  if (!autoTestRunning || autoTestCount >= autoTestMaxCount) {
+    stopAutoTest();
+    return;
+  }
+  
+  autoTestCount++;
+  updateAutoTestStatus();
+  
+  // 「こんにちは」を送信
+  const message = "こんにちは";
+  addMessageToHistory(message, "user-message");
+  socket.emit("user_message", { messages: [{ role: "user", content: message }] });
+}
+
+function scheduleNextAutoMessage() {
+  if (!autoTestRunning) return;
+  
+  // 1秒後に次のメッセージを送信
+  autoTestTimeoutId = setTimeout(() => {
+    sendAutoMessage();
+  }, 1000);
+}
+
+function updateAutoTestStatus() {
+  const statusDiv = document.getElementById("auto-test-status");
+  if (autoTestRunning) {
+    statusDiv.textContent = `自動テスト実行中: ${autoTestCount}/${autoTestMaxCount}`;
+  } else if (autoTestCount > 0) {
+    statusDiv.textContent = `自動テスト完了: ${autoTestCount}/${autoTestMaxCount}`;
+  } else {
+    statusDiv.textContent = "";
+  }
+}

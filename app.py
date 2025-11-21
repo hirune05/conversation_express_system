@@ -323,6 +323,7 @@ def handle_message(data):
         - The actual reply to the user.
         - **MUST BE IN JAPANESE.**
         - Use a casual, friendly tone (タメ口).
+        - **Use "ボク" as your first-person pronoun.**
     
     形式:
     <thought>

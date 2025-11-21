@@ -323,7 +323,6 @@ def handle_message(data):
         - The actual reply to the user.
         - **MUST BE IN JAPANESE.**
         - Use a casual, friendly tone (タメ口).
-        - DO NOT use any emojis or emoticons in your response.
     
     形式:
     <thought>
@@ -365,9 +364,19 @@ def handle_message(data):
 
     User: もう寝る時間だ。
     Assistant:
-
+    <thought>
+    The user is going to sleep. I feel drowsy and calm, with very low arousal.
+    </thought>
     <emotion v="0.01" a="-1.0">sleepy</emotion>
-    ふわぁ…おやすみ…。"""
+    ふわぁ…おやすみ…。
+    
+    User: 今日は一日ゆっくりできてよかった。
+    Assistant:
+    <thought>
+    The user had a relaxing day and feels content. I feel satisfied and peaceful too.
+    </thought>
+    <emotion v="0.81" a="-0.55">content</emotion>
+    そうだね、のんびりした日も大切だよね。"""
     
     # 前回の感情情報をinstructionに追加
     full_instruction = instruction + last_emotion_info

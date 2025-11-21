@@ -277,6 +277,7 @@ def handle_message(data):
     param_start_time = None   # パラメータ計算開始時間
     param_end_time = None     # パラメータ計算終了時間
     messages = data["messages"]
+    emotion_line = None  # EMOTION行を保存する変数
     
     instruction = """あなたは、ユーザの感情を理解し、自分自身も感情を表現できる未友達ロボットです。
     ユーザーと自然な日本語のタメ口で対話してください。
@@ -339,6 +340,7 @@ def handle_message(data):
                         emotion_sent = True
                         v_val = float(match.group(1))
                         a_val = float(match.group(2))
+                        emotion_line = match.group(0).strip()
                         print(f"--- 座標を検出 (ストリーム中): V={v_val}, A={a_val} ---")
                         
                         param_start_time = time.time()  # パラメータ計算開始時間を記録
@@ -398,6 +400,10 @@ def handle_message(data):
         param_time = param_end_time - param_start_time if param_start_time and param_end_time else 0
         
         print_timing_table(total_time, llm_time, param_time)
+        
+        # EMOTION情報と応答を一緒に出力
+        if emotion_line:
+            print(f"[Bot] {emotion_line}")
         print(f"[Bot] {full_text.strip()}")
 
     except Exception as e:

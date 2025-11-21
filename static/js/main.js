@@ -9,6 +9,7 @@ let savedEmotions = new Set();
 let rightAnimationActive = false;
 let rightAnimationStartTime = null;
 let rightAnimationDuration = 1000;
+let lastEmotion = null; // 前回の感情座標を保存
 
 // --- Socket.IO関連 ---
 const socket = io("http://127.0.0.1:5000");
@@ -84,6 +85,10 @@ function setupSocketListeners() {
 
   socket.on("bot_stream_end", (data) => {
     messages.push({ role: "assistant", content: data.text });
+    if (data.emotion) {
+      lastEmotion = data.emotion; // 感情座標を保存
+      console.log("Saved emotion:", lastEmotion);
+    }
     botMessageDiv = null; // リセット
   });
 
@@ -126,7 +131,10 @@ function sendMessage() {
   addMessageToHistory(text, "user-message");
   messages.push({ role: "user", content: text });
 
-  socket.emit("user_message", { messages: messages });
+  socket.emit("user_message", { 
+    messages: messages, 
+    last_emotion: lastEmotion 
+  });
 
   input.value = "";
 }

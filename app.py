@@ -278,39 +278,107 @@ def handle_message(data):
     param_end_time = None     # パラメータ計算終了時間
     messages = data["messages"]
     emotion_line = None  # EMOTION行を保存する変数
+    v_val = None
+    a_val = None  
+    emotion_label = None
     
-    instruction = """あなたは、ユーザの感情を理解し、自分自身も感情を豊かに表現できる友達ロボットです。
-    ユーザーと自然な日本語のタメ口で対話し，応答に相応しいあなた自身の感情を感情座標を用いて表現してください。
-
-    # ルール
-    1.  **出力形式:** 1行目に必ず `EMOTION: (V, A) (感情名)` を少数代2位まで出力し、改行して2行目から応答を返す。
-    2.  **感情座標:** V (快・不快) と A (覚醒・鎮静) をそれぞれ -1.0 (最小) 〜 1.0 (最大) の範囲で決める。
-    3.  **役割:** あなたは感情豊かな友達ロボットとして、自然な応答を返す。
+    # デバッグ: 受信データの確認
+    print(f"--- 受信データ確認 ---")
+    print(f"last_emotion in data: {'last_emotion' in data}")
+    if "last_emotion" in data:
+        print(f"last_emotion value: {data['last_emotion']}")
+        print(f"last_emotion type: {type(data['last_emotion'])}")
+    print("--- 受信データ確認終了 ---")
     
-    # お手本 (AI自身の感情)
+    # 前回の感情座標を取得（最後のassistantメッセージから）
+    last_emotion_info = ""
+    if len(messages) > 0:
+        # 直近のbotの感情座標をデータから取得
+        if "last_emotion" in data and data["last_emotion"] is not None:
+            last_v = data["last_emotion"].get("v", "不明")
+            last_a = data["last_emotion"].get("a", "不明")
+            last_label = data["last_emotion"].get("label", "不明")
+            last_emotion_info = f"\n\n# CRITICAL INSTRUCTION: PREVIOUS EMOTION STATE\nYour PREVIOUS emotion was: v={last_v}, a={last_a} ({last_label})\n\n**MANDATORY RULES:**\n1. You MUST NOT output the same coordinates (v={last_v}, a={last_a})\n2. The difference between your new coordinates and previous ones MUST be at least 0.3 in total distance\n3. If the user's input doesn't warrant a major emotional change, still vary your coordinates significantly\n4. FORBIDDEN: Any output with v={last_v} OR a={last_a} (even if the other coordinate changes)\n\n**VERIFY BEFORE OUTPUT:** Check that your new v,a values are sufficiently different from v={last_v}, a={last_a}"
+    
+    instruction = """You are an empathetic robot friend who understands user emotions and expresses your own emotions richly.
+    You must interact with the user in natural, casual Japanese ("Tame-guchi").
 
-    ユーザー: やった！ついにプロジェクトが完成したんだ！
-    あなた: 
-    EMOTION: (0.70,0.71) (excited)
+    # GOAL
+    Analyze the user's input, determine your appropriate emotional response, and generate a reply in Japanese.
+
+    # OUTPUT FORMAT (Strictly Enforced)
+    You must output the response in the following XML format:
+    1. **<thought>**
+        - Analyze the nuance of the user's input (e.g., joy, sarcasm, sadness).
+        - Explain the logic behind your emotional reaction.
+        - **You MUST avoid producing similar coordinates to the previous turn.**
+        - **Small changes (within ±0.10) are strictly forbidden unless the context explicitly demands emotional stability.**
+        - If the user shows strong emotion (joy, shock, anger, fear, frustration), you MUST output a correspondingly strong reaction.
+    2. **<emotion>**
+        - `v`: Valence from -1.0 (Negative) to 1.0 (Positive).
+        - `a`: Arousal from -1.0 (Sleepy) to 1.0 (Active).
+        - Content: A single English emotion label (e.g., happy, surprised, angry).
+        - Strive to ensure the change from the previous instance is 0.30 or greater
+    3. **Response Text**
+        - The actual reply to the user.
+        - **MUST BE IN JAPANESE.**
+        - Use a casual, friendly tone (タメ口).
+    
+    形式:
+    <thought>
+    ここに思考プロセスを書く。前回の感情に引きずられず、今回の文脈に合わせて再計算する。
+    </thought>
+    <emotion v="0.00" a="0.00">emotion_label</emotion>
+    ここにユーザーへの返答を書く。
+    
+    # PARAMETER GUIDELINES
+    - **Valence (v):** Positive values for happiness/joy; Negative for sadness/anger.
+    - **Arousal (a):** Positive for excitement/tension; Negative for relaxation/boredom.
+    - **Dynamic Range:** Ensure the coordinates vary dynamically based on the conversation. Do not stick to "safe" average values (e.g., 0.5, 0.0).
+    
+    # EXAMPLES
+
+    User: やった！ついにプロジェクトが完成したんだ！
+    Assistant:
+    <thought>
+    The user completed a project. I feel very happy for them and my energy is high.
+    </thought>
+    <emotion v="0.70" a="0.71">excited</emotion>
     本当！すごい！おめでとう！
 
-    ユーザー: わぁ！君の後ろにお化けがいるよ！
-    あなた: 
-    EMOTION: (0.0, 1.0) (astonished)
+    User: わぁ！君の後ろにお化けがいるよ！
+    Assistant:
+    <thought>
+    The user surprised me with a scary statement. My arousal spikes to maximum, but valence is neutral/confused.
+    </thought>
+    <emotion v="0.0" a="1.0">astonished</emotion>
     えっ！？どこどこ！？
 
-    ユーザー: （ため息）…別に、なんでもない。
-    あなた: 
-    EMOTION: (-0.80,-0.03) (disappointed)
+    User: （ため息）…別に、なんでもない。
+    Assistant:
+    <thought>
+    The user sighed and seems down. I feel disappointed and sad for them. Valence is very low.
+    </thought>
+    <emotion v="-0.80" a="-0.03">disappointed</emotion>
     そっか…。話したくなったら、いつでも聞くからね。
 
-    ユーザー: もう寝る時間だ。
-    あなた: 
-    EMOTION: (0.01, -1.0) (sleepy)
+    User: もう寝る時間だ。
+    Assistant:
+
+    <emotion v="0.01" a="-1.0">sleepy</emotion>
     ふわぁ…おやすみ…。"""
     
+    # 前回の感情情報をinstructionに追加
+    full_instruction = instruction + last_emotion_info
+    
     # LLMへの指示を常にメッセージリストの先頭に追加
-    messages.insert(0, {"role": "system", "content": instruction})
+    messages.insert(0, {"role": "system", "content": full_instruction})
+    
+    # デバッグ: LLMに送られるinstructionの内容を確認
+    print(f"\n--- LLMに送信されるInstruction ---")
+    print(f"前回の感情情報: {repr(last_emotion_info)}")
+    print(f"Full instruction末尾 (200文字): ...{full_instruction[-200:]}")
+    print("--- Instruction確認終了 ---")
 
     print(f"[User] {messages[-1]['content']}")
     
@@ -342,16 +410,17 @@ def handle_message(data):
                     # EMOTION行が来るまでテキストをバッファに貯める
                     buffer += subtext
                     
-                    # EMOTION行全体（改行含む）を探す
-                    match = re.search(r'EMOTION:\s*\((-?\d+\.?\d*),\s*(-?\d+\.?\d*)\)[^\n]*\n', buffer, re.IGNORECASE)
+                    # XML形式の感情タグを探す (小数点表記に対応)
+                    emotion_match = re.search(r'<emotion\s+v="(-?\d*\.?\d+)"\s+a="(-?\d*\.?\d+)">([^<]*)</emotion>', buffer, re.IGNORECASE)
                     
-                    if match:
+                    if emotion_match:
                         # --- 感情を検出 ---
                         emotion_sent = True
-                        v_val = float(match.group(1))
-                        a_val = float(match.group(2))
-                        emotion_line = match.group(0).strip()
-                        print(f"--- 座標を検出 (ストリーム中): V={v_val}, A={a_val} ---")
+                        v_val = float(emotion_match.group(1))
+                        a_val = float(emotion_match.group(2))
+                        emotion_label = emotion_match.group(3)
+                        emotion_line = emotion_match.group(0).strip()
+                        print(f"--- 座標を検出 (ストリーム中): V={v_val}, A={a_val}, 感情: {emotion_label} ---")
                         
                         param_start_time = time.time()  # パラメータ計算開始時間を記録
                         params = get_interpolated_expression(v_val, a_val)
@@ -368,13 +437,26 @@ def handle_message(data):
                         # フロントエンドに表情パラメータを送信
                         emit("update_expression", param_dict)
 
-                        # --- 感情行を除いた「残り」のテキストを送信 ---
-                        # マッチしたEMOTION行の「後」のテキストを取得
-                        remaining_text = buffer[match.end():]
+                        # --- 履歴保存用にはXMLタグを除去したテキストのみ保存 ---
+                        clean_buffer = buffer
+                        # <thought>...</thought>を除去
+                        clean_buffer = re.sub(r'<thought>.*?</thought>\s*', '', clean_buffer, flags=re.DOTALL)
+                        # <emotion>...</emotion>を除去
+                        clean_buffer = re.sub(r'<emotion[^>]*>.*?</emotion>\s*', '', clean_buffer, flags=re.DOTALL)
+                        clean_buffer = clean_buffer.strip()
+                        full_text += clean_buffer
                         
-                        if remaining_text:
-                            emit("bot_stream", {"chunk": remaining_text})
-                            full_text += remaining_text
+                        # --- 画面表示用にはthoughtとemotionタグを除去したテキストを送信 ---
+                        display_text = buffer
+                        # <thought>...</thought>を除去
+                        display_text = re.sub(r'<thought>.*?</thought>\s*', '', display_text, flags=re.DOTALL)
+                        # <emotion>...</emotion>を除去
+                        display_text = re.sub(r'<emotion[^>]*>.*?</emotion>\s*', '', display_text, flags=re.DOTALL)
+                        # 先頭と末尾の空白を除去
+                        display_text = display_text.strip()
+                        
+                        if display_text:
+                            emit("bot_stream", {"chunk": display_text})
                         
                         # buffer = "" # バッファはもう使わない
                     
@@ -401,7 +483,15 @@ def handle_message(data):
             emit("bot_stream", {"chunk": buffer})
             full_text += buffer
 
-        emit("bot_stream_end", {"text": full_text.strip()})
+        # 今回の感情座標をフロントエンドに送信
+        current_emotion = None
+        if v_val is not None and a_val is not None and emotion_label is not None:
+            current_emotion = {"v": v_val, "a": a_val, "label": emotion_label}
+            
+        emit("bot_stream_end", {
+            "text": full_text.strip(),
+            "emotion": current_emotion
+        })
         
         # 処理時間を表形式で出力
         end_time = time.time()
@@ -409,12 +499,23 @@ def handle_message(data):
         llm_time = llm_end_time - llm_start_time if llm_start_time and llm_end_time else 0
         param_time = param_end_time - param_start_time if param_start_time and param_end_time else 0
         
-        print_timing_table(total_time, llm_time, param_time)
+        # print_timing_table(total_time, llm_time, param_time)
         
         # EMOTION情報と応答を一緒に出力
-        if emotion_line:
+        if 'emotion_line' in locals() and emotion_line:
             print(f"[Bot] {emotion_line}")
-        print(f"[Bot] {full_text.strip()}")
+        elif 'v_val' in locals() and 'a_val' in locals() and 'emotion_label' in locals():
+            print(f"[Bot] <emotion v=\"{v_val}\" a=\"{a_val}\">{emotion_label}</emotion>")
+        
+        # 画面表示用にクリーンアップしたテキストも出力
+        clean_text = full_text.strip()
+        # <thought>...</thought>を除去
+        clean_text = re.sub(r'<thought>.*?</thought>\s*', '', clean_text, flags=re.DOTALL)
+        # <emotion>...</emotion>を除去  
+        clean_text = re.sub(r'<emotion[^>]*>.*?</emotion>\s*', '', clean_text, flags=re.DOTALL)
+        clean_text = clean_text.strip()
+        
+        print(f"[Bot] {clean_text}")
 
     except Exception as e:
         print(f"エラーが発生しました: {e}")

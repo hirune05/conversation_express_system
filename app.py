@@ -291,7 +291,7 @@ def handle_message(data):
 
     ユーザー: やった！ついにプロジェクトが完成したんだ！
     あなた: 
-    EMOTION: (0.8, 0.8) (excited)
+    EMOTION: (0.70,0.71) (excited)
     本当！すごい！おめでとう！
 
     ユーザー: わぁ！君の後ろにお化けがいるよ！
@@ -301,7 +301,7 @@ def handle_message(data):
 
     ユーザー: （ため息）…別に、なんでもない。
     あなた: 
-    EMOTION: (-0.8, -0.6) (disappointed)
+    EMOTION: (-0.80,-0.03) (disappointed)
     そっか…。話したくなったら、いつでも聞くからね。
 
     ユーザー: もう寝る時間だ。

@@ -225,7 +225,7 @@ def get_interpolated_expression(target_v, target_a):
                  weights_dict.get("sad", 0) + weights_dict.get("astonished", 0)
     Narrow_Score = weights_dict.get("sleepy", 0) + weights_dict.get("relaxed", 0)
     Score = Wide_Score - Narrow_Score
-    k = 15.0 
+    k = 20.0 
     sigmoid_output_eye = 1.0 / (1.0 + math.exp(-k * Score))
     
     MIN_OPENNESS = 0.2
@@ -251,7 +251,7 @@ def get_interpolated_expression(target_v, target_a):
     Score_coverage = Cover_Score - No_Cover_Score
 
     # ゲイン k (大きいほど急激に 0.0 か 1.0 に振り切れる)
-    k_coverage = 15.0
+    k_coverage = 20.0
 
     # シグモイド関数 (ゲートの開閉度: 0.0～1.0)
     # Score がプラス (Cover優勢) なら 1.0 に、マイナス (No_Cover優勢) なら 0.0 に近づく

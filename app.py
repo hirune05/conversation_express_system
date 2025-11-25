@@ -511,14 +511,14 @@ def handle_message(data):
         })
         
         # 会話データをCSVに保存
-        if len(messages) > 1:  # systemメッセージを除いた最後のユーザーメッセージを取得
-            user_msg = messages[-1]['content'] if messages[-1]['role'] == 'user' else ''
-            # セッションIDを取得または生成
-            session_id = data.get('session_id')
-            if not session_id:
-                session_id = str(uuid.uuid4())
-                print(f"--- 新しいセッションID生成: {session_id[:8]} ---")
-            save_conversation_to_csv(session_id, user_msg, full_text.strip(), v_val, a_val, emotion_label)
+        # if len(messages) > 1:  # systemメッセージを除いた最後のユーザーメッセージを取得
+        #     user_msg = messages[-1]['content'] if messages[-1]['role'] == 'user' else ''
+        #     # セッションIDを取得または生成
+        #     session_id = data.get('session_id')
+        #     if not session_id:
+        #         session_id = str(uuid.uuid4())
+        #         print(f"--- 新しいセッションID生成: {session_id[:8]} ---")
+        #     save_conversation_to_csv(session_id, user_msg, full_text.strip(), v_val, a_val, emotion_label)
         
         # 処理時間を表形式で出力
         end_time = time.time()

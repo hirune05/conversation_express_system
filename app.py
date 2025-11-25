@@ -1,6 +1,7 @@
 import os
 import re
 import time
+import uuid
 import numpy as np
 from flask import Flask, render_template, send_from_directory
 from flask_socketio import SocketIO, emit
@@ -13,8 +14,10 @@ import math
 LLM_MODEL = "qwen3:8b"
 # CSVファイルパス
 CSV_FILE_PATH = 'emotion_data.csv'
+CONVERSATION_CSV_PATH = 'conversation_data.csv'
 # CSVヘッダー
 CSV_HEADERS = ['subject_id', 'timestamp', 'emotion_label', 'animationDuration', 'eyeOpenness', 'pupilSize', 'pupilAngle', 'upperEyelidAngle', 'upperEyelidCoverage', 'lowerEyelidCoverage', 'mouthCurve', 'mouthHeight', 'mouthWidth']
+CONVERSATION_CSV_HEADERS = ['session_id', 'timestamp', 'user_message', 'bot_response', 'emotion_v', 'emotion_a', 'emotion_label']
 
 
 # --- FlaskとSocket.IOの初期化 ---
@@ -22,6 +25,9 @@ CSV_HEADERS = ['subject_id', 'timestamp', 'emotion_label', 'animationDuration', 
 app = Flask(__name__, static_folder='static', template_folder='.')
 app.config["SECRET_KEY"] = "C0HThSwr"
 socketio = SocketIO(app, cors_allowed_origins="*")
+
+# セッション管理用の辞書
+session_store = {}
 
 # --- Ollamaの初期化 ---
 client = ollama.Client()
@@ -193,7 +199,7 @@ def get_interpolated_expression(target_v, target_a):
                  weights_dict.get("sad", 0) + weights_dict.get("astonished", 0)
     Narrow_Score = weights_dict.get("sleepy", 0) + weights_dict.get("relaxed", 0)
     Score = Wide_Score - Narrow_Score
-    k = 20.0 
+    k = 15.0 
     sigmoid_output_eye = 1.0 / (1.0 + math.exp(-k * Score))
     
     MIN_OPENNESS = 0.2
@@ -219,7 +225,7 @@ def get_interpolated_expression(target_v, target_a):
     Score_coverage = Cover_Score - No_Cover_Score
 
     # ゲイン k (大きいほど急激に 0.0 か 1.0 に振り切れる)
-    k_coverage = 20.0
+    k_coverage = 15.0
 
     # シグモイド関数 (ゲートの開閉度: 0.0～1.0)
     # Score がプラス (Cover優勢) なら 1.0 に、マイナス (No_Cover優勢) なら 0.0 に近づく
@@ -504,6 +510,16 @@ def handle_message(data):
             "emotion": current_emotion
         })
         
+        # 会話データをCSVに保存
+        if len(messages) > 1:  # systemメッセージを除いた最後のユーザーメッセージを取得
+            user_msg = messages[-1]['content'] if messages[-1]['role'] == 'user' else ''
+            # セッションIDを取得または生成
+            session_id = data.get('session_id')
+            if not session_id:
+                session_id = str(uuid.uuid4())
+                print(f"--- 新しいセッションID生成: {session_id[:8]} ---")
+            save_conversation_to_csv(session_id, user_msg, full_text.strip(), v_val, a_val, emotion_label)
+        
         # 処理時間を表形式で出力
         end_time = time.time()
         total_time = end_time - start_time
@@ -550,6 +566,36 @@ def handle_save_data(data):
     except Exception as e:
         print(f"--- CSV保存エラー: {e} ---")
         emit('save_error', {'message': str(e)})
+
+def save_conversation_to_csv(session_id, user_message, bot_response, v_val, a_val, emotion_label):
+    """会話データをCSVに保存する関数"""
+    try:
+        import time
+        timestamp = time.strftime('%Y-%m-%d %H:%M:%S')
+        
+        # ファイルが存在しない場合はヘッダーを書き込む
+        file_exists = os.path.isfile(CONVERSATION_CSV_PATH)
+        
+        with open(CONVERSATION_CSV_PATH, 'a', newline='', encoding='utf-8') as f:
+            writer = csv.DictWriter(f, fieldnames=CONVERSATION_CSV_HEADERS)
+            if not file_exists:
+                writer.writeheader()
+            
+            conversation_data = {
+                'session_id': session_id,
+                'timestamp': timestamp,
+                'user_message': user_message,
+                'bot_response': bot_response,
+                'emotion_v': v_val if v_val is not None else '',
+                'emotion_a': a_val if a_val is not None else '',
+                'emotion_label': emotion_label if emotion_label is not None else ''
+            }
+            writer.writerow(conversation_data)
+        
+        print(f"--- 会話データが {CONVERSATION_CSV_PATH} に保存されました (セッション: {session_id[:8]}) ---")
+        
+    except Exception as e:
+        print(f"--- 会話CSV保存エラー: {e} ---")
 
 @socketio.on('manual_update_expression')
 def handle_manual_update(data):

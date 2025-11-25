@@ -10,6 +10,7 @@ let rightAnimationActive = false;
 let rightAnimationStartTime = null;
 let rightAnimationDuration = 1000;
 let lastEmotion = null; // 前回の感情座標を保存
+let sessionId = null; // セッションIDを保存
 
 // --- Socket.IO関連 ---
 const socket = io("http://127.0.0.1:5000");
@@ -72,6 +73,9 @@ function setupSocketListeners() {
 
   socket.on("connect", () => {
     console.log("サーバーに接続しました。");
+    // 新しい接続時にセッションIDを生成
+    sessionId = generateSessionId();
+    console.log("セッションID生成:", sessionId);
   });
 
   socket.on("bot_stream", (data) => {
@@ -133,7 +137,8 @@ function sendMessage() {
 
   socket.emit("user_message", { 
     messages: messages, 
-    last_emotion: lastEmotion 
+    last_emotion: lastEmotion,
+    session_id: sessionId
   });
 
   input.value = "";
@@ -286,5 +291,11 @@ function setExpression(v, a) {
   socket.emit("manual_update_expression", { v: v, a: a });
 }
 
+// セッションID生成関数
+function generateSessionId() {
+  return 'session_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
+}
+
 // Make it accessible from the browser console
 window.setExpression = setExpression;
+window.generateSessionId = generateSessionId;

@@ -388,8 +388,11 @@ def handle_message(data):
     # 前回の感情情報をinstructionに追加
     full_instruction = instruction + last_emotion_info
     
-    # LLMへの指示を常にメッセージリストの先頭に追加
-    messages.insert(0, {"role": "system", "content": full_instruction})
+    # システムメッセージが既に存在する場合は置き換え、なければ先頭に追加
+    if messages and messages[0]["role"] == "system":
+        messages[0]["content"] = full_instruction
+    else:
+        messages.insert(0, {"role": "system", "content": full_instruction})
     
     # デバッグ: LLMに送られるinstructionの内容を確認
     print(f"\n--- LLMに送信されるInstruction ---")
